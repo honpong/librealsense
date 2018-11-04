@@ -47,6 +47,8 @@ endif()
             ../../common/ux-window.cpp
             ../../common/ux-alignment.cpp
             ../../common/ux-alignment.h
+            ../../common/zero_order_fix.cpp
+            ../../common/zero_order_fix.h
         )
 
     # config-ui

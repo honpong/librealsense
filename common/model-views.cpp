@@ -25,6 +25,7 @@
 
 #define ARCBALL_CAMERA_IMPLEMENTATION
 #include <arcball_camera.h>
+#include "zero_order_fix.h"
 
 constexpr const char* recommended_fw_url = "https://downloadcenter.intel.com/download/27522/Latest-Firmware-for-Intel-RealSense-D400-Product-Family?v=t";
 constexpr const char* store_url = "https://click.intel.com/";
@@ -902,6 +903,19 @@ namespace rs2
                 // the block will be internally available, but removed from UI
                 //post_processing.push_back(disparity_to_depth);
             }
+
+            auto zero_order = std::make_shared<zero_order_fix_processor>();
+            zero_order_artifact_fix = std::make_shared<processing_block_model>(
+                this, "zero_order_artifact_fix", zero_order,
+                [=](rs2::frame f) { return zero_order->process(f); }, error_message);
+            zero_order_artifact_fix->enabled = s->is<depth_stereo_sensor>();
+            if (s->is<depth_stereo_sensor>())
+            {
+                zero_order_artifact_fix->enabled = true;
+                // the block will be internally available, but removed from UI
+                //post_processing.push_back(disparity_to_depth);
+            }
+            post_processing.push_back(zero_order_artifact_fix);
         }
         else
         {
@@ -3116,6 +3130,7 @@ namespace rs2
                             auto temp_filter = s.second.dev->temporal_filter;
                             auto hole_filling = s.second.dev->hole_filling_filter;
                             auto disparity_2_depth = s.second.dev->disparity_to_depth;
+                            auto z_order = s.second.dev->zero_order_artifact_fix;
 
                             if (depth_2_disparity->enabled)
                                 f = depth_2_disparity->invoke(f);
@@ -3131,6 +3146,9 @@ namespace rs2
 
                             if (hole_filling->enabled)
                                 f = hole_filling->invoke(f);
+
+                            if (z_order->enabled)
+                                f = z_order->invoke(f);
                         }
 
                         break;

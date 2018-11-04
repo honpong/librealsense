@@ -116,6 +116,9 @@ public:
         case RS2_FORMAT_Y8:
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, frame.get_data());
             break;
+        case RS2_FORMAT_Z16:
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_LUMINANCE, GL_UNSIGNED_SHORT, frame.get_data());
+            break;
         default:
             throw std::runtime_error("The requested format is not supported by this demo!");
         }
