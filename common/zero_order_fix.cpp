@@ -99,7 +99,8 @@ void zero_order_fix_processor::process_frame(rs2::frameset data, rs2::frame_sour
 
     zero_order_fix((const uint16_t*)depth_frame.get_data(), (const uint8_t*)ir_frame.get_data(), (uint16_t*)out_frame.get_data(), points.get_vertices(), depth_intrinsics);
 
-    source.frame_ready(out_frame);
+    auto res = _hole_filling2.process(_hole_filling.process(out_frame));
+    source.frame_ready(res);
 }
 
 std::vector<rs2::frame> zero_order_fix_processor::get_frames(rs2::frameset frame)
@@ -123,6 +124,9 @@ zero_order_fix_processor::zero_order_fix_processor()
 })
 {
     start(_queue);
+
+    _hole_filling.set_option(RS2_OPTION_HOLES_FILL, 3.f);
+    _hole_filling2.set_option(RS2_OPTION_HOLES_FILL, 0.f);
 }
 
 

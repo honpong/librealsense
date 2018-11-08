@@ -761,7 +761,7 @@ namespace rs2
     private:
         viewer_model& viewer;
         void process(rs2::frame f, const rs2::frame_source& source);
-        std::vector<rs2::frame> handle_frame(rs2::frame f);
+        rs2::frame handle_frame(rs2::frame f);
 
         rs2::frame apply_filters(rs2::frame f);
         rs2::frame last_tex_frame;
