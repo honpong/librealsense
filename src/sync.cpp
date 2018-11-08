@@ -595,6 +595,6 @@ namespace librealsense
     bool timestamp_composite_matcher::are_equivalent(double a, double b, int fps)
     {
         auto gap = 1000.f / (float)fps;
-        return abs(a - b) < ((float)gap / (float)2) ;
+        return abs(a - b) < ((float)gap /*/ (float)2*/); // w/a  untill L500 will have metadata
     }
 }

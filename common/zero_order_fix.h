@@ -4,11 +4,6 @@
 #pragma once
 #include <librealsense2/rs.hpp>
 
-void zero_order_fix(const uint16_t * frame_data_in, uint16_t * frame_data_out,
-    rs2_intrinsics intrinsics,
-    int zo_point_x = 315, int zo_point_y = 237,
-    int rtd_high_threshold = 200, int rtd_low_threshold = -200,
-    int baseline = 31, int patch_r =5);
 
 class zero_order_fix_processor : public rs2::processing_block
 {

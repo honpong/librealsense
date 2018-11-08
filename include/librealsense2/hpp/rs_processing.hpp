@@ -694,6 +694,33 @@ namespace rs2
         }
     };
 
+    class zero_order_fix : public processing_block
+    {
+    public:
+        /**
+        * Create hole filling processing block
+        * the processing perform the hole filling base on different hole filling mode.
+        */
+        zero_order_fix() : processing_block(init(), 1) {}
+
+    private:
+        friend class context;
+
+        std::shared_ptr<rs2_processing_block> init()
+        {
+            rs2_error* e = nullptr;
+            auto block = std::shared_ptr<rs2_processing_block>(
+                rs2_create_zero_order_fix_block(&e),
+                rs2_delete_processing_block);
+            error::handle(e);
+
+            // Redirect options API to the processing block
+            //options::operator=(_block);
+
+            return block;
+        }
+    };
+
     class hole_filling_filter : public processing_block
     {
     public:

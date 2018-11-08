@@ -12,7 +12,7 @@
 // capture depth and color video streams and render them to the screen
 int main(int argc, char * argv[]) try
 {
-    rs2::log_to_console(RS2_LOG_SEVERITY_DEBUG);
+    rs2::log_to_console(RS2_LOG_SEVERITY_ERROR);
     // Create a simple OpenGL window for rendering:
     window app(1280, 1280, "RealSense Capture Example");
     // Declare two textures on the GPU, one for color and one for depth
@@ -45,7 +45,7 @@ int main(int argc, char * argv[]) try
     rs2::frame_queue q;
     depth_ref_sensor.start(q);
     std::ifstream ifile;
-    ifile.open("sample_2in_z.640x480.bin16", std::ios::binary);
+    ifile.open("sample_4in_z.640x480.bin16", std::ios::binary);
 
     std::vector<char> depth_frame(640 * 480 * 2);
     std::vector<char> depth_frame_ref(640 * 480 * 2);
@@ -55,12 +55,12 @@ int main(int argc, char * argv[]) try
     ifile.read(depth_frame.data(), 640 * 480 * 2);
     ifile.close();
 
-    ifile.open("sample_2out_z.640x480.bin16", std::ios::binary);
+    ifile.open("sample_4out_z.640x480.bin16", std::ios::binary);
     ifile.read(depth_frame_ref.data(), 640 * 480 * 2);
 
     ifile.close();
 
-    ifile.open("sample_2in_ir.640x480.bin8", std::ios::binary);
+    ifile.open("sample_4in_ir.640x480.bin8", std::ios::binary);
     ifile.read(ir_frame.data(), 640 * 480);
 
     
@@ -99,7 +99,7 @@ int main(int argc, char * argv[]) try
         //auto ir = q.wait_for_frame(); // Wait for next set of frames from the camera
         auto depth_res = zo.process(frames);
 
-        for (auto i = 0;i < 640 * 480; i++)
+       /* for (auto i = 0;i < 640 * 480; i++)
         {
             auto res = ((uint16_t*)depth_res.get_data())[i];
             auto out = ((uint16_t*)depth_out.get_data())[i];
@@ -108,7 +108,7 @@ int main(int argc, char * argv[]) try
                 std::cout << "fail";
             }
 
-        }
+        }*/
         auto color_in = c.colorize(frames.get_depth_frame());
         auto color_out = c.colorize(depth_out);
         auto color_res = c.colorize(depth_res);

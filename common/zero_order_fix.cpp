@@ -6,7 +6,10 @@
 
 uint16_t get_pixel_rtd(const rs2::vertex v, int baseline)
 {
-    auto rtd = sqrt(v.x*v.x + v.y*v.y + v.z*v.z) + sqrt((v.x - baseline) *(v.x - baseline) + v.y*v.y + v.z*v.z);
+    auto x = v.x;
+    auto y = v.y;
+    auto z = v.z;
+    auto rtd = sqrt((int)x*x + (int)y*y + (int)z*z) + sqrt((int)(x - baseline) *(x - baseline) + (int)y*y + (int)z*z);
     return v.z ? rtd : 0;
 }
 
@@ -43,7 +46,9 @@ void detect_zero_order(const uint16_t * rtd, const uint16_t * depth_data_in, con
     rs2_intrinsics intrinsics, int rtd_high_threshold, int rtd_low_threshold, int ir_threshold,
     uint16_t zo_value, uint8_t iro_value)
 {
-    auto i_threshold_relative = (iro_value* ir_threshold) / 256;//(int)(((float)ir_threshold / 256.f) * iro_value);
+    auto ir_dynamic_range = 256;
+    auto i_threshold_relative = (ir_threshold*(iro_value) ^ 2) / ir_dynamic_range ^ 2;
+    //auto i_threshold_relative = (iro_value* ir_threshold) / 256;//(int)(((float)ir_threshold / 256.f) * iro_value);
 
     for (auto i = 0; i < intrinsics.height*intrinsics.width; i++)
     {
@@ -60,28 +65,39 @@ void detect_zero_order(const uint16_t * rtd, const uint16_t * depth_data_in, con
         }
     }
 }
-
+#include <iostream>
 void zero_order_fix(const uint16_t * depth_data_in, const uint8_t * ir_data, uint16_t * depth_data_out,
     const rs2::vertex* vertices,
     rs2_intrinsics intrinsics,
-    int zo_point_x = 314, int zo_point_y = 236, int ir_threshold = 115,
+    int zo_point_x = 315, int zo_point_y = 237, int ir_threshold = 115,
     int rtd_high_threshold = 200, int rtd_low_threshold = 200,
     int baseline = 31, int patch_r = 5)
 {
-    std::ifstream f;
-    f.open("sample_1out_rtd.640x480.bin16", std::ios::binary);
-    std::vector<uint16_t> rtd_ref(intrinsics.height*intrinsics.width*2);
-    f.read((char*)rtd_ref.data(), intrinsics.height*intrinsics.width*2);
+    
+    //std::ifstream f;
+    //f.open("sample_2out_rtd.640x480.bin16", std::ios::binary);
+    //std::vector<uint16_t> rtd_ref(intrinsics.height*intrinsics.width*2);
+    //f.read((char*)rtd_ref.data(), intrinsics.height*intrinsics.width*2);
     std::vector<uint16_t> rtd( intrinsics.height*intrinsics.width);
     z2rtd(vertices, rtd.data(), intrinsics, baseline);
+    /*for (auto i = 0;i < rtd.size(); i++)
+    {
+        if (rtd[i] != rtd_ref[i])
+        {
+            int x = 0;
+        }
+    }*/
     auto zo_value = get_zo_point_value(rtd.data(), intrinsics, zo_point_x, zo_point_y, patch_r);
     auto iro_value = get_zo_point_value(ir_data, intrinsics, zo_point_x, zo_point_y, patch_r);
     detect_zero_order(rtd.data(), depth_data_in, ir_data, depth_data_out, intrinsics, rtd_high_threshold, rtd_low_threshold, ir_threshold, zo_value, iro_value);
+    
 
+   
 }
 
 void zero_order_fix_processor::process_frame(rs2::frameset data, rs2::frame_source & source)
 {
+    auto start = std::chrono::high_resolution_clock::now();
     if (!_source_profile)
         _source_profile = data.get_depth_frame().get_profile();
 
@@ -99,8 +115,11 @@ void zero_order_fix_processor::process_frame(rs2::frameset data, rs2::frame_sour
 
     zero_order_fix((const uint16_t*)depth_frame.get_data(), (const uint8_t*)ir_frame.get_data(), (uint16_t*)out_frame.get_data(), points.get_vertices(), depth_intrinsics);
 
-    auto res = _hole_filling2.process(_hole_filling.process(out_frame));
-    source.frame_ready(res);
+    //auto res = _hole_filling2.process(_hole_filling.process(out_frame));
+    auto end = std::chrono::high_resolution_clock::now();
+    auto diff = std::chrono::duration<double, std::milli>((end - start));
+    std::cout << diff.count() << std::endl;
+    source.frame_ready(out_frame);
 }
 
 std::vector<rs2::frame> zero_order_fix_processor::get_frames(rs2::frameset frame)

@@ -906,7 +906,7 @@ namespace rs2
 
             auto zero_order = std::make_shared<zero_order_fix>();
             zero_order_artifact_fix = std::make_shared<processing_block_model>(
-                this, "zero_order_artifact_fix", zero_order,
+                this, "zero order fix", zero_order,
                 [=](rs2::frame f) { return zero_order->process(f); }, error_message);
             zero_order_artifact_fix->enabled = s->is<depth_stereo_sensor>();
             if (s->is<depth_stereo_sensor>())

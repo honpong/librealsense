@@ -199,6 +199,7 @@ set(REALSENSE_CPP
     src/proc/temporal-filter.cpp
     src/proc/hole-filling-filter.cpp
     src/proc/disparity-transform.cpp
+    src/proc/zero-order.cpp
     src/source.cpp
     src/ds5/ds5-options.cpp
     src/ds5/ds5-timestamp.cpp
@@ -334,6 +335,7 @@ set(REALSENSE_HPP
     src/proc/spatial-filter.h
     src/proc/temporal-filter.h
     src/proc/hole-filling-filter.h
+    src/proc/zero-order.h
     src/proc/syncer-processing-block.h
     src/proc/disparity-transform.h
     src/algo.h
@@ -618,6 +620,7 @@ if(WIN32)
         src/proc/hole-filling-filter.cpp
         src/proc/syncer-processing-block.cpp
         src/proc/disparity-transform.cpp
+        src/proc/zero-order.cpp
         )
 
     source_group("Header Files\\Processing Blocks" FILES
@@ -632,6 +635,7 @@ if(WIN32)
         src/proc/syncer-processing-block.h
         src/proc/disparity-transform.h
         src/proc/hole-filling-filter.h
+        src/proc/zero-order.h
         )
 
     if(BUILD_WITH_STATIC_CRT)

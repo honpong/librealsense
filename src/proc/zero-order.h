@@ -16,5 +16,10 @@ namespace librealsense
         rs2::frame process_frame(const rs2::frame_source& source, const rs2::frame& f) override;
     private:
         bool should_process(const rs2::frame& frame) override;
+
+        rs2::stream_profile     _source_profile;
+        rs2::stream_profile     _target_profile;
+
+        rs2::pointcloud         _pc;
     };
 }

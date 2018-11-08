@@ -187,6 +187,10 @@ rs2_processing_block* rs2_create_disparity_transform_block(unsigned char transfo
 */
 rs2_processing_block* rs2_create_hole_filling_filter_block(rs2_error** error);
 
+/**
+* Creates Depth post-processing zero order fix block. The filter zero pixels that has a wrong value due to zero order effect
+*/
+rs2_processing_block* rs2_create_zero_order_fix_block(rs2_error** error);
 #ifdef __cplusplus
 }
 #endif
