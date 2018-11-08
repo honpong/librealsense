@@ -904,7 +904,7 @@ namespace rs2
                 //post_processing.push_back(disparity_to_depth);
             }
 
-            auto zero_order = std::make_shared<zero_order_fix_processor>();
+            auto zero_order = std::make_shared<zero_order_fix>();
             zero_order_artifact_fix = std::make_shared<processing_block_model>(
                 this, "zero_order_artifact_fix", zero_order,
                 [=](rs2::frame f) { return zero_order->process(f); }, error_message);
@@ -3107,62 +3107,68 @@ namespace rs2
 
     rs2::frame post_processing_filters::apply_filters(rs2::frame f)
     {
-        rs2_stream stream_type = f.get_profile().stream_type();
-        if (stream_type == RS2_STREAM_DEPTH || stream_type == RS2_STREAM_COLOR || stream_type == RS2_STREAM_INFRARED)
+        for (auto&& s : viewer.streams)
         {
-            for (auto&& s : viewer.streams)
+            if (!s.second.dev) continue;
+            auto dev = s.second.dev;
+
+            if (s.second.original_profile.unique_id() == f.get_profile().unique_id())
             {
-                if (!s.second.dev) continue;
-                auto dev = s.second.dev;
-
-                if (s.second.original_profile.unique_id() == f.get_profile().unique_id())
+                if (dev->post_processing_enabled)
                 {
-                    if (dev->post_processing_enabled)
-                    {
-                        auto dec_filter = s.second.dev->decimation_filter;
-                        if (dec_filter->enabled)
-                            f = dec_filter->invoke(f);
+                    auto dec_filter = s.second.dev->decimation_filter;
+                    auto depth_2_disparity = s.second.dev->depth_to_disparity;
+                    auto spatial_filter = s.second.dev->spatial_filter;
+                    auto temp_filter = s.second.dev->temporal_filter;
+                    auto hole_filling = s.second.dev->hole_filling_filter;
+                    auto disparity_2_depth = s.second.dev->disparity_to_depth;
+                    auto z_order = s.second.dev->zero_order_artifact_fix;
 
-                        if (stream_type == RS2_STREAM_DEPTH)
-                        {
-                            auto depth_2_disparity = s.second.dev->depth_to_disparity;
-                            auto spatial_filter = s.second.dev->spatial_filter;
-                            auto temp_filter = s.second.dev->temporal_filter;
-                            auto hole_filling = s.second.dev->hole_filling_filter;
-                            auto disparity_2_depth = s.second.dev->disparity_to_depth;
-                            auto z_order = s.second.dev->zero_order_artifact_fix;
+                    if (z_order && z_order->enabled)
+                        f = z_order->invoke(f);
 
-                            if (depth_2_disparity->enabled)
-                                f = depth_2_disparity->invoke(f);
+                    if (dec_filter && dec_filter->enabled)
+                        f = dec_filter->invoke(f);
 
-                            if (spatial_filter->enabled)
-                                f = spatial_filter->invoke(f);
+                    if (depth_2_disparity && depth_2_disparity->enabled)
+                        f = depth_2_disparity->invoke(f);
 
-                            if (temp_filter->enabled)
-                                f = temp_filter->invoke(f);
+                    if (spatial_filter && spatial_filter->enabled)
+                        f = spatial_filter->invoke(f);
 
-                            if (disparity_2_depth->enabled)
-                                f = disparity_2_depth->invoke(f);
+                    if (temp_filter && temp_filter->enabled)
+                        f = temp_filter->invoke(f);
 
-                            if (hole_filling->enabled)
-                                f = hole_filling->invoke(f);
+                    if (disparity_2_depth && disparity_2_depth->enabled)
+                            f = disparity_2_depth->invoke(f);
 
-                            if (z_order->enabled)
-                                f = z_order->invoke(f);
-                        }
+                    if (hole_filling && hole_filling->enabled)
+                        f = hole_filling->invoke(f);
 
-                        break;
-                    }
+                    break;
                 }
             }
         }
 
         // Override the zero pixel in texture frame with black color for occlusion invalidation
         // TODO - this is a temporal solution to be refactored from the app level into the core library
-        switch (stream_type)
+        std::vector<rs2::frame> frames;
+        if (auto composite = f.as<rs2::frameset>())
         {
-        case RS2_STREAM_COLOR:
+            for (auto&& f : composite)
+                frames.push_back(f);
+        }
+        else
+            frames.push_back(f);
+
+        for (auto&& f : frames)
         {
+            auto stream_type = f.get_profile().stream_type();
+
+            switch (stream_type)
+            {
+            case RS2_STREAM_COLOR:
+            {
                 auto rgb_stream = const_cast<uint8_t*>(static_cast<const uint8_t*>(f.get_data()));
                 memset(rgb_stream, 0, 3);
                 // Alternatively, enable the next two lines to render invalidation with magenta color for inspection
@@ -3178,22 +3184,91 @@ namespace rs2
             break;
             default:
                 break;
+            }
         }
+       
 
         return f;
     }
 
+    void post_processing_filters::map_id(rs2::frame new_frame, rs2::frame old_frame)
+    {
+        if (auto new_set = new_frame.as<rs2::frameset>())
+        {
+            if (auto old_set = old_frame.as<rs2::frameset>())
+            {
+                map_id_frameset_to_frameset(new_set, old_set);
+            }
+            else
+            {
+                map_id_frameset_to_frame(new_set, old_frame);
+            }
+        }
+        else if (auto old_set = old_frame.as<rs2::frameset>())
+        {
+            map_id_frameset_to_frame(old_set, new_frame);
+        }
+        else
+            map_id_frame_to_frame(new_frame, old_frame);
+    }
+
+    void post_processing_filters::map_id_frameset_to_frame(rs2::frameset first, rs2::frame second)
+    {
+        if(auto f = first.first_or_default(second.get_profile().stream_type()))
+        {
+            auto first_uid = f.get_profile().unique_id();
+            auto second_uid = second.get_profile().unique_id();
+
+            viewer.streams_origin[first_uid] = second_uid;
+            viewer.streams_origin[second_uid] = first_uid;
+        }
+    }
+
+    void post_processing_filters::map_id_frameset_to_frameset(rs2::frameset first, rs2::frameset second)
+    {
+        for (auto&& f : first)
+        {
+            auto first_uid = f.get_profile().unique_id();
+            if (auto second_f = second.first_or_default(f.get_profile().stream_type()))
+            {
+                auto second_uid = second_f.get_profile().unique_id();
+
+                viewer.streams_origin[first_uid] = second_uid;
+                viewer.streams_origin[second_uid] = first_uid;
+            }
+        }
+    }
+
+    void rs2::post_processing_filters::map_id_frame_to_frame(rs2::frame first, rs2::frame second)
+    {
+        if (first.get_profile().stream_type() == second.get_profile().stream_type())
+        {
+            auto first_uid = first.get_profile().unique_id();
+            auto second_uid = second.get_profile().unique_id();
+
+            viewer.streams_origin[first_uid] = second_uid;
+            viewer.streams_origin[second_uid] = first_uid;
+        }
+    }
+
+
     std::vector<rs2::frame> post_processing_filters::handle_frame(rs2::frame f)
     {
         std::vector<rs2::frame> res;
+
         auto filtered = apply_filters(f);
-        res.push_back(filtered);
+        map_id(filtered, f);
 
-        auto uid = f.get_profile().unique_id();
-        auto new_uid = filtered.get_profile().unique_id();
-        viewer.streams_origin[uid] = new_uid;
-        viewer.streams_origin[new_uid] = uid;
-
+        if (auto composite = filtered.as<rs2::frameset>())
+        {
+            for (auto&& frame : composite)
+            {
+                res.push_back(frame);
+            }
+        }
+        else
+            res.push_back(filtered);
+           
         if(viewer.is_3d_view)
         {
             if(viewer.is_3d_depth_source(f))
@@ -3209,30 +3284,18 @@ namespace rs2
         return res;
     }
 
+
     void post_processing_filters::process(rs2::frame f, const rs2::frame_source& source)
     {
         points p;
         std::vector<frame> results;
-        frame res;
 
-        if (auto composite = f.as<rs2::frameset>())
-        {
-            for (auto&& f : composite)
-            {
-                auto res = handle_frame(f);
-                results.insert(results.end(), res.begin(), res.end());
-            }
-        }
-        else
-        {
-             auto res = handle_frame(f);
-             results.insert(results.end(), res.begin(), res.end());
-        }
+        auto res = handle_frame(f);
+        
+        auto frame = source.allocate_composite_frame(res);
 
-        res = source.allocate_composite_frame(results);
-
-        if(res)
-            source.frame_ready(std::move(res));
+        if(frame)
+            source.frame_ready(std::move(frame));
     }
 
     void post_processing_filters::start()
