@@ -621,6 +621,24 @@ namespace rs2
         * \return            number of bytes per one pixel
         */
         int get_bytes_per_pixel() const { return get_bits_per_pixel() / 8; }
+
+		int get_compressed_size() const
+		{
+			rs2_error* e = nullptr;
+			return rs2_get_frame_compressed_size(get(), &e);
+		}
+
+        void set_compressed_size(int size) const
+        {
+            rs2_error* e = nullptr;
+            rs2_set_frame_compressed_size(get(), size, &e);
+        }
+
+        void set_frame_format(rs2_format format) const
+        {
+            rs2_error* e = nullptr;
+            rs2_set_frame_format(get(), format, &e);
+        }
     };
 
     struct vertex {
@@ -896,6 +914,8 @@ namespace rs2
         depth_frame get_depth_frame() const
         {
             auto f = first_or_default(RS2_STREAM_DEPTH, RS2_FORMAT_Z16);
+            if (!f)
+                f = first_or_default(RS2_STREAM_DEPTH, RS2_FORMAT_Z16H);
             return f.as<depth_frame>();
         }
         /**

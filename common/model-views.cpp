@@ -15,6 +15,7 @@
 #include <librealsense2/rsutil.h>
 
 #include "model-views.h"
+#include "huffman.h"
 #include <imgui_internal.h>
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
@@ -25,6 +26,8 @@
 
 #define ARCBALL_CAMERA_IMPLEMENTATION
 #include <arcball_camera.h>
+
+#define _RESET_FREQUENCY_ 4
 
 constexpr const char* recommended_fw_url = "https://downloadcenter.intel.com/download/27522/Latest-Firmware-for-Intel-RealSense-D400-Product-Family?v=t";
 constexpr const char* store_url = "https://click.intel.com/";
@@ -3167,6 +3170,8 @@ namespace rs2
 
     std::vector<rs2::frame> post_processing_filters::handle_frame(rs2::frame f)
     {
+        decode(f);
+
         std::vector<rs2::frame> res;
         auto filtered = apply_filters(f);
         res.push_back(filtered);
@@ -3190,6 +3195,47 @@ namespace rs2
 
         return res;
     }
+
+	void post_processing_filters::decode(frame & f)
+	{
+		if (f.get_profile().format() == RS2_FORMAT_Z16H || f.get_profile().format() == RS2_FORMAT_Z16)
+		{
+			video_frame vf = f.as<video_frame>();
+			if (vf.get_compressed_size() != -1)
+			{
+                size_t frame_size = vf.get_width() * vf.get_height() * 2;
+                if (!last_frame.size() < frame_size)
+                    last_frame.resize(frame_size);
+
+                int size = vf.get_compressed_size();
+				memmove(d_buf.data(), f.get_data(), size);
+				int lengthOfCompressedImageInU32s = size >> 2;
+
+                const void * a = f.get_data();
+                void * b = (void *)vf.get_data();
+
+                memset(b, 0, frame_size);
+
+                if (!unhuffimage4(reinterpret_cast<uint32_t *>(d_buf.data()), lengthOfCompressedImageInU32s, vf.get_width() << 1, vf.get_height(), (unsigned char*)vf.get_data()))
+                {
+                    memmove((unsigned char *)vf.get_data(), last_frame.data(), frame_size);
+
+                    if (reset_counter == 0 || reset_counter % _RESET_FREQUENCY_ == 0)
+                        dev->sensor_reset();
+
+                    ++reset_counter;
+                }
+                else
+                {
+                    memmove(last_frame.data(), vf.get_data(), frame_size);
+                    reset_counter = 0;
+                }
+
+                vf.set_compressed_size(-1);
+                vf.set_frame_format(RS2_FORMAT_Z16);
+            }
+		}
+	}
 
     void post_processing_filters::process(rs2::frame f, const rs2::frame_source& source)
     {
@@ -3217,10 +3263,11 @@ namespace rs2
             source.frame_ready(std::move(res));
     }
 
-    void post_processing_filters::start()
+    void post_processing_filters::start(device * dev_)
     {
         if (render_thread_active.exchange(true) == false)
         {
+            dev = dev_;
             viewer.syncer->start();
             render_thread = std::thread([&](){post_processing_filters::render_loop();});
         }
@@ -3452,7 +3499,7 @@ namespace rs2
 
                         auto texture = upload_frame(std::move(frame));
 
-                        if ((selected_tex_source_uid == -1 && frame.get_profile().format() == RS2_FORMAT_Z16) || frame.get_profile().format() != RS2_FORMAT_ANY && is_3d_texture_source(frame))
+                        if ((selected_tex_source_uid == -1 && (frame.get_profile().format() == RS2_FORMAT_Z16 || frame.get_profile().format() == RS2_FORMAT_Z16H)) || frame.get_profile().format()!= RS2_FORMAT_ANY && is_3d_texture_source(frame))
                         {
                             texture_frame = texture;
                         }
@@ -3771,7 +3818,7 @@ namespace rs2
             auto textured_frame = streams[stream].texture->get_last_frame(true).as<video_frame>();
             if (streams[stream].show_map_ruler && frame && textured_frame &&
                 RS2_STREAM_DEPTH == stream_mv.profile.stream_type() &&
-                RS2_FORMAT_Z16 == stream_mv.profile.format())
+                (RS2_FORMAT_Z16 == stream_mv.profile.format() || RS2_FORMAT_Z16H == stream_mv.profile.format()))
             {
                 assert(RS2_FORMAT_RGB8 == textured_frame.get_profile().format());
                 static const std::string depth_units = "m";
@@ -4169,7 +4216,7 @@ namespace rs2
     void viewer_model::begin_stream(std::shared_ptr<subdevice_model> d, rs2::stream_profile p)
     {
         // Starting post processing filter rendering thread
-        ppf.start();
+        ppf.start(&(d->dev));
         streams[p.unique_id()].begin_stream(d, p);
         ppf.frames_queue.emplace(p.unique_id(), rs2::frame_queue(5));
     }
@@ -5937,8 +5984,8 @@ namespace rs2
                     sub->draw_stream_selection();
 
                 static const std::vector<rs2_option> drawing_order = dev.is<advanced_mode>() ?
-                    std::vector<rs2_option>{                           RS2_OPTION_EMITTER_ENABLED, RS2_OPTION_ENABLE_AUTO_EXPOSURE }
-                  : std::vector<rs2_option>{ RS2_OPTION_VISUAL_PRESET, RS2_OPTION_EMITTER_ENABLED, RS2_OPTION_ENABLE_AUTO_EXPOSURE };
+                    std::vector<rs2_option>{                           RS2_OPTION_EMITTER_ENABLED, RS2_OPTION_EMITTER_ON_AND_OFF_ENABLED, RS2_OPTION_ENABLE_AUTO_EXPOSURE }
+                  : std::vector<rs2_option>{ RS2_OPTION_VISUAL_PRESET, RS2_OPTION_EMITTER_ENABLED, RS2_OPTION_EMITTER_ON_AND_OFF_ENABLED, RS2_OPTION_ENABLE_AUTO_EXPOSURE };
 
                 for (auto& opt : drawing_order)
                 {

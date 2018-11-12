@@ -21,7 +21,7 @@ namespace librealsense
             throw invalid_value_exception("resolution not found.");
         }
 
-        rs2_intrinsics get_intrinsic_by_resolution_coefficients_table(const std::vector<uint8_t> & raw_data, uint32_t width, uint32_t height)
+        rs2_intrinsics get_intrinsic_by_resolution_coefficients_table(const std::vector<uint8_t> & raw_data, uint32_t width, uint32_t height, uint32_t fps)
         {
             auto table = check_calib<ds::coefficients_table>(raw_data);
 
@@ -39,7 +39,7 @@ namespace librealsense
                 << intrinsics_string(res_1280_800)
                 << intrinsics_string(res_960_540));
 
-            auto resolution = width_height_to_ds5_rect_resolutions(width ,height);
+            auto resolution = width_height_to_ds5_rect_resolutions(width, width == 848 && height == 100 ? 480 : height);
             rs2_intrinsics intrinsics;
             intrinsics.width = resolutions_list[resolution].x;
             intrinsics.height = resolutions_list[resolution].y;
@@ -58,6 +58,14 @@ namespace librealsense
             intrinsics.ppy = rect_params[3];
             intrinsics.model = RS2_DISTORTION_BROWN_CONRADY;
             memset(intrinsics.coeffs, 0, sizeof(intrinsics.coeffs));  // All coefficients are zeroed since rectified depth is defined as CS origin
+
+            if (width == 848 && height == 100)
+            {
+                intrinsics.height = 100;
+                if (fps <= 90)
+                    intrinsics.ppy -= 190;
+            }
+
             return intrinsics;
         }
 
@@ -111,13 +119,13 @@ namespace librealsense
             return calc_intrinsic;
         }
 
-        rs2_intrinsics get_intrinsic_by_resolution(const vector<uint8_t> & raw_data, calibration_table_id table_id, uint32_t width, uint32_t height)
+        rs2_intrinsics get_intrinsic_by_resolution(const vector<uint8_t> & raw_data, calibration_table_id table_id, uint32_t width, uint32_t height, uint32_t fps)
         {
             switch (table_id)
             {
             case coefficients_table_id:
             {
-                return get_intrinsic_by_resolution_coefficients_table(raw_data, width, height);
+                return get_intrinsic_by_resolution_coefficients_table(raw_data, width, height, fps);
             }
             case fisheye_calibration_id:
             {

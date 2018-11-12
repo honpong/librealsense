@@ -205,7 +205,7 @@ namespace librealsense
 
     bool is_z_or_disparity(rs2_format format)
     {
-        if (format == RS2_FORMAT_Z16 || format == RS2_FORMAT_DISPARITY16 || format == RS2_FORMAT_DISPARITY32)
+        if (format == RS2_FORMAT_Z16 || format == RS2_FORMAT_Z16H || format == RS2_FORMAT_DISPARITY16 || format == RS2_FORMAT_DISPARITY32)
             return true;
         return false;
     }
@@ -219,7 +219,7 @@ namespace librealsense
         rs2_format format = profile.format();
         int index = profile.stream_index();
 
-        if (_stream_filter.stream != RS2_STREAM_ANY && _stream_filter.stream != stream)
+        if (_stream_filter.stream != RS2_STREAM_ANY && _stream_filter.stream != stream && RS2_FORMAT_Z16H != format)
             return false;
         if (is_z_or_disparity(_stream_filter.format))
         {

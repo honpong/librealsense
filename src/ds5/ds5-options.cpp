@@ -435,4 +435,52 @@ namespace librealsense
     {
         return *_range;
     }
+
+    emitter_on_and_off_option::emitter_on_and_off_option(hw_monitor& hwm)
+        : _hwm(hwm)
+    {
+        _range = [this]()
+        {
+            return option_range{ 0, 1, 1, 0 };
+        };
+    }
+
+    void emitter_on_and_off_option::set(float value)
+    {
+        command cmd(ds::SET_PWM_ON_OFF);
+        cmd.param1 = static_cast<int>(value);
+
+        _hwm.send(cmd);
+        _record_action(*this);
+    }
+
+    float emitter_on_and_off_option::query() const
+    {
+        command cmd(ds::GET_PWM_ON_OFF);
+        auto res = _hwm.send(cmd);
+        if (res.empty())
+            throw invalid_value_exception("external_sync_mode::query result is empty!");
+
+        return (res.front());
+    }
+
+    option_range emitter_on_and_off_option::get_range() const
+    {
+        return *_range;
+    }
+
+    uncompress_option::uncompress_option(sensor_base & sensor)
+        : option_base(option_range{ 0.0f, 1.0f, 1.0f, 0.0f }), _sensor(sensor)
+    {
+    }
+
+    void uncompress_option::set(float value)
+    {
+        _sensor.set_uncompress(abs(value) > 0.0001f);
+    }
+
+    float uncompress_option::query() const
+    {
+        return static_cast<float>(_sensor.get_uncompress());
+    }
 }

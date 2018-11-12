@@ -1039,11 +1039,14 @@ namespace rs2
             auto rendered_frame = frame;
             auto image = frame.as<video_frame>();
 
+            int c_size = 1;
             if (image)
             {
                 width = image.get_width();
                 height = image.get_height();
                 stride = image.get_stride_in_bytes();
+
+                c_size = image.get_compressed_size();
             }
 
             glBindTexture(GL_TEXTURE_2D, texture);
@@ -1054,6 +1057,7 @@ namespace rs2
             case RS2_FORMAT_ANY:
                 throw std::runtime_error("not a valid format");
             case RS2_FORMAT_Z16:
+			case RS2_FORMAT_Z16H:
             case RS2_FORMAT_DISPARITY16:
                 if (frame.is<depth_frame>())
                 {
@@ -1440,6 +1444,7 @@ namespace rs2
             switch (format)
             {
             case RS2_FORMAT_Z16:
+			case RS2_FORMAT_Z16H:
             case RS2_FORMAT_Y16:
             case RS2_FORMAT_DISPARITY16:
             {
