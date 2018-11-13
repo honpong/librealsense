@@ -12,16 +12,19 @@
 // capture depth and color video streams and render them to the screen
 int main(int argc, char * argv[]) try
 {
-    rs2::log_to_console(RS2_LOG_SEVERITY_ERROR);
+    
+    rs2::log_to_console(RS2_LOG_SEVERITY_DEBUG);
     // Create a simple OpenGL window for rendering:
     window app(1280, 1280, "RealSense Capture Example");
     // Declare two textures on the GPU, one for color and one for depth
     texture depth_image, ir_image;
     rs2::software_device dev; // Create software-only device
+    
     dev.create_matcher(RS2_MATCHER_DI);
     auto depth_sensor = dev.add_sensor("Depth"); // Define single sensor
+    //rs2::recorder rec("C:/private/librealsense/build/examples/capture/1.bag", dev);
     auto depth_ref_sensor = dev.add_sensor("Depth_ref"); // Define single sensor
-
+    
     rs2_intrinsics depth_intrinsics = { 640, 480, 312.1740, 247.3893, 558.9540, 572.0936, RS2_DISTORTION_BROWN_CONRADY ,{ 0,0,0,0,0 } };
     auto depth_stream = depth_sensor.add_video_stream({ RS2_STREAM_DEPTH, 0, 0,
                              640, 480, 60, 2,
@@ -35,7 +38,7 @@ int main(int argc, char * argv[]) try
                              640, 480, 60, 1,
                              RS2_FORMAT_Y8, depth_intrinsics });
 
-    depth_sensor.add_read_only_option(RS2_OPTION_DEPTH_UNITS, 0.125);
+    depth_sensor.add_read_only_option(RS2_OPTION_DEPTH_UNITS, 0.000125);
     depth_sensor.open({ depth_stream,ir_stream });
     depth_ref_sensor.open(depth_stream_out);
     rs2::syncer s;
@@ -65,7 +68,7 @@ int main(int argc, char * argv[]) try
 
     
     rs2::colorizer c;
-    zero_order_fix_processor zo;
+    rs2::zero_order_fix zo;
     while(app) // Application still alive?
     {
        
@@ -125,7 +128,7 @@ int main(int argc, char * argv[]) try
         depth_image.render(color_res, { app.width() / 2,  app.height() / 2, app.width() / 2, app.height() / 2 });
         //color_image.render(color, { app.width() / 2, 0, app.width() / 2, app.height() });
     }
-
+    //rec.resume();
     return EXIT_SUCCESS;
 }
 catch (const rs2::error & e)

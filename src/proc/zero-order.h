@@ -5,6 +5,7 @@
 
 #include "../include/librealsense2/hpp/rs_frame.hpp"
 #include "synthetic-stream.h"
+#include "option.h"
 
 namespace librealsense
 {
@@ -19,7 +20,8 @@ namespace librealsense
 
         rs2::stream_profile     _source_profile;
         rs2::stream_profile     _target_profile;
-
         rs2::pointcloud         _pc;
+
+        uint8_t                 _ir_threshold;
     };
 }

@@ -82,7 +82,24 @@ namespace librealsense
     }
 
     zero_order::zero_order()
+       : _ir_threshold(115)
     {
+        auto ir_threshold = std::make_shared<ptr_option<uint8_t>>(
+            0,
+            255,
+            1,
+            115,
+            &_ir_threshold,
+            "ir threshold");
+        ir_threshold->on_set([ir_threshold](float val)
+        {
+            if (!ir_threshold->is_valid(val))
+                throw invalid_value_exception(to_string()
+                    << "Unsupported ir threshold " << val << " is out of range.");
+
+        });
+
+        register_option(RS2_OPTION_FILTER_ZO_IR_THRESHOLD, ir_threshold);
     }
 
     rs2::frame zero_order::process_frame(const rs2::frame_source & source, const rs2::frame & f)
