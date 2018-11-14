@@ -265,6 +265,8 @@ namespace librealsense
             CASE(STREAM_FORMAT_FILTER)
             CASE(STREAM_INDEX_FILTER)
             CASE(FILTER_ZO_IR_THRESHOLD)
+            CASE(FILTER_ZO_RTD_HIGH_THRESHOLD)
+            CASE(FILTER_ZO_RTD_LOW_THRESHOLD)
         default: assert(!is_valid(value)); return UNKNOWN_VALUE;
         }
 #undef CASE

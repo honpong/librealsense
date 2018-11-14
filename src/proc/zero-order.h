@@ -23,5 +23,7 @@ namespace librealsense
         rs2::pointcloud         _pc;
 
         uint8_t                 _ir_threshold;
+        uint16_t                _rtd_high_threshold;
+        uint16_t                _rtd_low_threshold;
     };
 }
