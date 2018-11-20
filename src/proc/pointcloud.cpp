@@ -143,7 +143,7 @@ namespace librealsense
         {
             for (int w = 0; w < _depth_intrinsics->width; ++w)
             {
-                const float pixel[] = { (float)w, (float)h };
+                const float pixel[] = { (float)w+1, (float)h+1 };
 
                 float x = (pixel[0] - _depth_intrinsics->ppx) / _depth_intrinsics->fx;
                 float y = (pixel[1] - _depth_intrinsics->ppy) / _depth_intrinsics->fy;

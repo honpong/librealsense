@@ -267,6 +267,10 @@ namespace librealsense
             CASE(FILTER_ZO_IR_THRESHOLD)
             CASE(FILTER_ZO_RTD_HIGH_THRESHOLD)
             CASE(FILTER_ZO_RTD_LOW_THRESHOLD)
+            CASE(FILTER_ZO_POINT_X)
+            CASE(FILTER_ZO_POINT_Y)
+            CASE(FILTER_ZO_BASELINE)
+            CASE(FILTER_ZO_PATCH_SIZE)
         default: assert(!is_valid(value)); return UNKNOWN_VALUE;
         }
 #undef CASE

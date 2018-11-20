@@ -857,7 +857,7 @@ namespace rs2
                 this, "Decimation Filter", decimate,
                 [=](rs2::frame f) { return decimate->process(f); },
                 error_message);
-            decimation_filter->enabled = true;
+            decimation_filter->enabled = false;
             post_processing.push_back(decimation_filter);
 
             auto depth_2_disparity = std::make_shared<rs2::disparity_transform>();
@@ -866,7 +866,7 @@ namespace rs2
                 [=](rs2::frame f) { return depth_2_disparity->process(f); }, error_message);
             if (s->is<depth_stereo_sensor>())
             {
-                depth_to_disparity->enabled = true;
+                depth_to_disparity->enabled = false;
                 post_processing.push_back(depth_to_disparity);
             }
 
@@ -875,14 +875,14 @@ namespace rs2
                 this, "Spatial Filter", spatial,
                 [=](rs2::frame f) { return spatial->process(f); },
                 error_message);
-            spatial_filter->enabled = true;
+            spatial_filter->enabled = false;
             post_processing.push_back(spatial_filter);
 
             auto temporal = std::make_shared<rs2::temporal_filter>();
             temporal_filter = std::make_shared<processing_block_model>(
                 this, "Temporal Filter", temporal,
                 [=](rs2::frame f) { return temporal->process(f); }, error_message);
-            temporal_filter->enabled = true;
+            temporal_filter->enabled = false;
             post_processing.push_back(temporal_filter);
 
             auto hole_filling = std::make_shared<rs2::hole_filling_filter>();
@@ -899,7 +899,7 @@ namespace rs2
             disparity_to_depth->enabled = s->is<depth_stereo_sensor>();
             if (s->is<depth_stereo_sensor>())
             {
-                disparity_to_depth->enabled = true;
+                disparity_to_depth->enabled = false;
                 // the block will be internally available, but removed from UI
                 //post_processing.push_back(disparity_to_depth);
             }
@@ -915,6 +915,7 @@ namespace rs2
                 // the block will be internally available, but removed from UI
                 //post_processing.push_back(disparity_to_depth);
             }
+
             post_processing.push_back(zero_order_artifact_fix);
         }
         else

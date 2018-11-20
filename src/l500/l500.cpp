@@ -144,6 +144,30 @@ namespace librealsense
 
         return std::make_shared<timestamp_composite_matcher>(matchers);
     }
+    void l500_device::read_zo_point(int* zo_x, int* zo_y)
+    {
+        command cmd(1, 0xa00e1b8c, 0xa00e1b90);
+        auto res = _hw_monitor->send(cmd);
+        auto data = (uint16_t*)res.data();
+        *zo_x = data[0];
+        *zo_y = data[1];
+    }
+    int l500_device::read_algo_version()
+    {
+        command cmd(1, 0xa0020bd8, 0xa0020bdc);
+        auto res = _hw_monitor->send(cmd);
+        auto data = (uint8_t*)res.data();
+        auto ver = data[0] + 100* data[1];
+        return ver;
+    }
+
+    float l500_device::read_baseline()
+    {
+        command cmd(1, 0xa00e0868, 0xa00e086c);
+        auto res = _hw_monitor->send(cmd);
+        auto data = (float*)res.data();
+        return *data;
+    }
     rs2_time_t l500_timestamp_reader_from_metadata::get_frame_timestamp(const request_mapping& mode, const platform::frame_object& fo)
     {
         std::lock_guard<std::recursive_mutex> lock(_mtx);

@@ -14,9 +14,12 @@ namespace librealsense
     {
     public:
         zero_order();
+        
         rs2::frame process_frame(const rs2::frame_source& source, const rs2::frame& f) override;
     private:
         bool should_process(const rs2::frame& frame) override;
+        bool read_zo_point(const rs2::frame& frame);
+        bool read_baseline(const rs2::frame& frame);
 
         rs2::stream_profile     _source_profile;
         rs2::stream_profile     _target_profile;
@@ -25,5 +28,9 @@ namespace librealsense
         uint8_t                 _ir_threshold;
         uint16_t                _rtd_high_threshold;
         uint16_t                _rtd_low_threshold;
+        float                   _baseline;
+        int                     _zo_point_x;
+        int                     _zo_point_y;
+        int                     _patch_size;
     };
 }

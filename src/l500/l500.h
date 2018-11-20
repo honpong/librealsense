@@ -293,6 +293,11 @@ namespace librealsense
 
 
         virtual std::shared_ptr<matcher> create_matcher(const frame_holder& frame) const override;
+
+        void read_zo_point(int* zo_x, int* zo_y);
+        int  read_algo_version();
+        float  read_baseline();
+
     private:
         const uint8_t _depth_device_idx;
         std::shared_ptr<hw_monitor> _hw_monitor;
