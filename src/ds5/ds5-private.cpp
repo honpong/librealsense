@@ -2,6 +2,8 @@
 //// Copyright(c) 2015 Intel Corporation. All Rights Reserved.
 
 #include "ds5-private.h"
+#include "ds5-device.h"
+#include "ds5-options.h"
 
 using namespace std;
 
@@ -18,10 +20,10 @@ namespace librealsense
                 if (elem.second.x == width && elem.second.y == height)
                     return elem.first;
             }
-            throw invalid_value_exception("resolution not found.");
+            return max_ds5_rect_resolutions;
         }
 
-        rs2_intrinsics get_intrinsic_by_resolution_coefficients_table(const std::vector<uint8_t> & raw_data, uint32_t width, uint32_t height)
+        rs2_intrinsics get_intrinsic_by_resolution_coefficients_table(const std::vector<uint8_t> & raw_data, uint32_t width, uint32_t height, uint32_t fps, const ds5_device* owner)
         {
             auto table = check_calib<ds::coefficients_table>(raw_data);
 
@@ -39,26 +41,63 @@ namespace librealsense
                 << intrinsics_string(res_1280_800)
                 << intrinsics_string(res_960_540));
 
-            auto resolution = width_height_to_ds5_rect_resolutions(width ,height);
-            rs2_intrinsics intrinsics;
-            intrinsics.width = resolutions_list[resolution].x;
-            intrinsics.height = resolutions_list[resolution].y;
-
-            auto rect_params = static_cast<const float4>(table->rect_params[resolution]);
-            // DS5U - assume ideal intrinsic params
-            if ((rect_params.x == rect_params.y) && (rect_params.z == rect_params.w))
+            auto resolution = width_height_to_ds5_rect_resolutions(width, width == 848 && height == 100 ? 480 : height);
+            if (resolution < max_ds5_rect_resolutions)
             {
-                rect_params.x = rect_params.y = intrinsics.width * 1.5f;
-                rect_params.z = intrinsics.width * 0.5f;
-                rect_params.w = intrinsics.height * 0.5f;
+                rs2_intrinsics intrinsics;
+                intrinsics.width = resolutions_list[resolution].x;
+                intrinsics.height = resolutions_list[resolution].y;
+
+                auto rect_params = static_cast<const float4>(table->rect_params[resolution]);
+                // DS5U - assume ideal intrinsic params
+                if ((rect_params.x == rect_params.y) && (rect_params.z == rect_params.w))
+                {
+                    rect_params.x = rect_params.y = intrinsics.width * 1.5f;
+                    rect_params.z = intrinsics.width * 0.5f;
+                    rect_params.w = intrinsics.height * 0.5f;
+                }
+                intrinsics.fx = rect_params[0];
+                intrinsics.fy = rect_params[1];
+                intrinsics.ppx = rect_params[2];
+                intrinsics.ppy = rect_params[3];
+                intrinsics.model = RS2_DISTORTION_BROWN_CONRADY;
+                memset(intrinsics.coeffs, 0, sizeof(intrinsics.coeffs));  // All coefficients are zeroed since rectified depth is defined as CS origin
+
+                if (width == 848 && height == 100)
+                {
+                    intrinsics.height = 100;
+                    ds5_device* ds5 = const_cast<ds5_device*>(owner);
+                    start_line_option slo(*(ds5->get_hw_monitor()));
+                    intrinsics.ppy -= slo.query();
+                }
+
+                return intrinsics;
             }
-            intrinsics.fx = rect_params[0];
-            intrinsics.fy = rect_params[1];
-            intrinsics.ppx = rect_params[2];
-            intrinsics.ppy = rect_params[3];
-            intrinsics.model = RS2_DISTORTION_BROWN_CONRADY;
-            memset(intrinsics.coeffs, 0, sizeof(intrinsics.coeffs));  // All coefficients are zeroed since rectified depth is defined as CS origin
-            return intrinsics;
+            else
+            {
+                ds5_rect_resolutions resolution = res_1920_1080;
+                rs2_intrinsics intrinsics;
+                intrinsics.width = width;
+                intrinsics.height = height;
+                
+                auto rect_params = static_cast<const float4>(table->rect_params[resolution]);
+                // DS5U - assume ideal intrinsic params
+                if ((rect_params.x == rect_params.y) && (rect_params.z == rect_params.w))
+                {
+                    rect_params.x = rect_params.y = intrinsics.width * 1.5f;
+                    rect_params.z = intrinsics.width * 0.5f;
+                    rect_params.w = intrinsics.height * 0.5f;
+                }
+
+                intrinsics.fx = rect_params[0] * width / resolutions_list[resolution].x;
+                intrinsics.fy = rect_params[1] * height / resolutions_list[resolution].y;
+                intrinsics.ppx = rect_params[2] * width / resolutions_list[resolution].x;
+                intrinsics.ppy = rect_params[3] * height / resolutions_list[resolution].y;
+                intrinsics.model = RS2_DISTORTION_BROWN_CONRADY;
+                memset(intrinsics.coeffs, 0, sizeof(intrinsics.coeffs));  // All coefficients are zeroed since rectified depth is defined as CS origin
+
+                return intrinsics;
+            }
         }
 
         rs2_intrinsics get_intrinsic_fisheye_table(const std::vector<uint8_t>& raw_data, uint32_t width, uint32_t height)
@@ -111,13 +150,13 @@ namespace librealsense
             return calc_intrinsic;
         }
 
-        rs2_intrinsics get_intrinsic_by_resolution(const vector<uint8_t> & raw_data, calibration_table_id table_id, uint32_t width, uint32_t height)
+        rs2_intrinsics get_intrinsic_by_resolution(const vector<uint8_t> & raw_data, calibration_table_id table_id, uint32_t width, uint32_t height, uint32_t fps, const ds5_device* owner)
         {
             switch (table_id)
             {
             case coefficients_table_id:
             {
-                return get_intrinsic_by_resolution_coefficients_table(raw_data, width, height);
+                return get_intrinsic_by_resolution_coefficients_table(raw_data, width, height, fps, owner);
             }
             case fisheye_calibration_id:
             {

@@ -1,0 +1,10 @@
+diff a/examples/example.hpp b/examples/example.hpp	(rejected hunks)
+@@ -192,7 +192,7 @@ private:
+ 
+     std::vector<rect> calc_grid(float2 window, std::vector<rs2::video_frame>& frames)
+     {
+-        auto grid = calc_grid(window, frames.size());
++        auto grid = calc_grid(window, (int)frames.size());
+ 
+         int index = 0;
+         std::vector<rect> rv;

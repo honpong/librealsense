@@ -264,6 +264,8 @@ namespace librealsense
             CASE(STREAM_FILTER)
             CASE(STREAM_FORMAT_FILTER)
             CASE(STREAM_INDEX_FILTER)
+            CASE(EMITTER_ON_AND_OFF_ENABLED)
+            CASE(848X100_START_LINE)
         default: assert(!is_valid(value)); return UNKNOWN_VALUE;
         }
 #undef CASE
