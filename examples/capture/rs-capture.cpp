@@ -39,7 +39,7 @@ int main(int argc, char * argv[]) try
     // Create a simple OpenGL window for rendering:
     window app(1280, 1280, "RealSense Capture Example");
     // Declare two textures on the GPU, one for color and one for depth
-    texture depth_image, ir_image;
+    texture depth_image, depth_image_res, ir_image, depth_image_ref;
     rs2::software_device dev; // Create software-only device
     
     dev.create_matcher(RS2_MATCHER_DI);
@@ -70,7 +70,7 @@ int main(int argc, char * argv[]) try
     rs2::frame_queue q;
     depth_ref_sensor.start(q);
     std::ifstream ifile;
-    ifile.open("sample_8in_z.640x480.bin16", std::ios::binary);
+    ifile.open("sample_2in_z.640x480.bin16", std::ios::binary);
 
     std::vector<uint16_t> depth_frame(640 * 480 * 2);
     std::vector<char> depth_frame_ref(640 * 480 * 2);
@@ -85,12 +85,12 @@ int main(int argc, char * argv[]) try
     ifile.read((char*)depth_frame.data(), 640 * 480 * 2);
     ifile.close();
 
-    ifile.open("sample_8out_z.640x480.bin16", std::ios::binary);
+    ifile.open("sample_2out_z.640x480.bin16", std::ios::binary);
     ifile.read(depth_frame_ref.data(), 640 * 480 * 2);
 
     ifile.close();
 
-    ifile.open("sample_8in_ir.640x480.bin8", std::ios::binary);
+    ifile.open("sample_2in_ir.640x480.bin8", std::ios::binary);
     ifile.read(ir_frame.data(), 640 * 480);
 
     /*rotate_270_degrees_clockwise<2>(depth_frame_rotated.data(), (char*)depth_frame.data(), 640, 480);
@@ -99,6 +99,9 @@ int main(int argc, char * argv[]) try
 
     rs2::colorizer c;
     rs2::zero_order_fix zo;
+    zo.set_option(RS2_OPTION_FILTER_ZO_POINT_X, 315);
+    zo.set_option(RS2_OPTION_FILTER_ZO_POINT_Y, 237);
+    zo.set_option(RS2_OPTION_FILTER_ZO_IR_MIN_VALUE, 0);
     while(app) // Application still alive?
     {
        
@@ -134,17 +137,17 @@ int main(int argc, char * argv[]) try
 
         for (auto i = 0;i < 640 * 480; i++)
         {
-            auto res = ((uint16_t*)depth_res.get_data())[i];
+            auto res = ((uint16_t*)depth_res.as<rs2::frameset>().get_depth_frame().get_data())[i];
             auto out = ((uint16_t*)depth_out.get_data())[i];
             if (res != out)
             {
-                std::cout << "fail";
+                std::cout << i <<" ";
             }
 
         }
         auto color_in = c.colorize(frames.get_depth_frame());
         auto color_out = c.colorize(depth_out);
-        auto color_res = c.colorize(depth_res);
+        auto color_res = c.colorize(depth_res.as<rs2::frameset>().get_depth_frame());
 
        /* auto color_in = frames.get_depth_frame();
         auto color_out = depth_out;
@@ -152,10 +155,10 @@ int main(int argc, char * argv[]) try
         
         
         // Render depth on to the first half of the screen and color on to the second
-        depth_image.render(color_in, { 0,               0, app.width() / 2, app.height()/2 });
-        depth_image.render(color_out, { app.width() / 2, 0, app.width() / 2, app.height()/2 });
-        ir_image.render(frames.get_infrared_frame(),  { 0,  app.height()/2 , app.width() / 2, app.height()/2});
-        depth_image.render(color_res, { app.width() / 2,  app.height() / 2, app.width() / 2, app.height() / 2 });
+        depth_image.render(color_in, {                      0,                      0,                      app.width() / 2,        app.height() / 2 });
+        ir_image.render(frames.get_infrared_frame() ,{ app.width() / 2,        0,                      app.width() / 2,        app.height() / 2 });
+        depth_image_ref.render(color_out,   {   0,                      app.height() / 2 ,      app.width() / 2,        app.height() / 2 });
+        depth_image_res.render(color_res,  {   app.width() / 2,        app.height() / 2,       app.width() / 2,        app.height() / 2 });
         //color_image.render(color, { app.width() / 2, 0, app.width() / 2, app.height() });
     }
     //rec.resume();

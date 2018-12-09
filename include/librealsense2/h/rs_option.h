@@ -74,6 +74,10 @@ extern "C" {
         RS2_OPTION_FILTER_ZO_POINT_Y,
         RS2_OPTION_FILTER_ZO_BASELINE,
         RS2_OPTION_FILTER_ZO_PATCH_SIZE,
+        RS2_OPTION_FILTER_ZO_MAX_VALUE,
+        RS2_OPTION_FILTER_ZO_IR_MIN_VALUE,
+        RS2_OPTION_FILTER_ZO_THRESHOLD_OFFSET,
+        RS2_OPTION_FILTER_ZO_THRESHOLD_SCALE,
         RS2_OPTION_COUNT                                        /**< Number of enumeration values. Not a valid input: intended to be used in for-loops. */
     } rs2_option;
     const char* rs2_option_to_string(rs2_option option);
