@@ -397,7 +397,7 @@ namespace librealsense
        
         auto data = f.as<rs2::frameset>();
         
-        //auto start = std::chrono::high_resolution_clock::now();
+       //auto start = std::chrono::high_resolution_clock::now();
         if (!_source_profile)
             _source_profile = data.get_depth_frame().get_profile();
 
@@ -412,16 +412,19 @@ namespace librealsense
         auto out_frame = source.allocate_video_frame(_target_profile, depth_frame, 0, 0, 0, 0, RS2_EXTENSION_DEPTH_FRAME);
         auto depth_intrinsics = depth_frame.get_profile().as<rs2::video_stream_profile>().get_intrinsics();
 
-        if(zero_order_fix((const uint16_t*)depth_frame.get_data(), 
-            (const uint8_t*)ir_frame.get_data(), 
-            (uint16_t*)out_frame.get_data(), 
-            points.get_vertices(), 
+        if (zero_order_fix((const uint16_t*)depth_frame.get_data(),
+            (const uint8_t*)ir_frame.get_data(),
+            (uint16_t*)out_frame.get_data(),
+            points.get_vertices(),
             depth_intrinsics,
-           _options))
-        //auto end = std::chrono::high_resolution_clock::now();
-        //auto diff = std::chrono::duration<double, std::milli>((end - start));
-        //std::cout << diff.count() << std::endl;
+            _options))
+        {
+            //auto end = std::chrono::high_resolution_clock::now();
+            //auto diff = std::chrono::duration<double, std::milli>((end - start));
+            //std::cout << diff.count() << std::endl;
             return out_frame;
+        }
+            
         else
             return f;
     }
@@ -434,6 +437,20 @@ namespace librealsense
             return true;
         }
         return false;
+    }
+
+    rs2::frame zero_order::prepare_output(const rs2::frame_source & source, rs2::frame input, std::vector<rs2::frame> results)
+    {
+        if (auto composite = input.as<rs2::frameset>())
+        {
+            composite.foreach([&](rs2::frame f) 
+            {
+                if (f.get_profile().stream_type() != RS2_STREAM_DEPTH)
+                    results.push_back(f);
+            });
+        }
+       
+        return source.allocate_composite_frame(results);
     }
    
 };

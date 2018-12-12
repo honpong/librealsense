@@ -526,7 +526,7 @@ namespace librealsense
 
         _next_expected[matcher.get()] = f.frame->get_frame_timestamp() + gap;
         _next_expected_domain[matcher.get()] = f.frame->get_frame_timestamp_domain();
-        LOG_DEBUG(_name << frame_to_string(const_cast<frame_holder&>(f))<<"fps " <<fps<<" gap " <<gap<<" next_expected: "<< _next_expected[matcher.get()]);
+        LOG_DEBUG(_name << frame_to_string(const_cast<frame_holder&>(f))<<"fps " <<fps<<" gap " <<gap<<" next_expected: "<<std::fixed<< _next_expected[matcher.get()]);
 
     }
 
@@ -595,6 +595,6 @@ namespace librealsense
     bool timestamp_composite_matcher::are_equivalent(double a, double b, int fps)
     {
         auto gap = 1000.f / (float)fps;
-        return abs(a - b) < ((float)gap /*/ (float)2*/); // w/a  untill L500 will have metadata
+        return abs(a - b) < ((float)gap /(float)2); // w/a  untill L500 will have metadata
     }
 }

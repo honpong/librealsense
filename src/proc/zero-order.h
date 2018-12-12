@@ -47,6 +47,7 @@ namespace librealsense
         rs2::frame process_frame(const rs2::frame_source& source, const rs2::frame& f) override;
     private:
         bool should_process(const rs2::frame& frame) override;
+        rs2::frame prepare_output(const rs2::frame_source& source, rs2::frame input, std::vector<rs2::frame> results) override;
         bool try_read_zo_point(const rs2::frame& frame, int* zo_point_x, int* zo_point_y);
         bool try_read_baseline(const rs2::frame& frame, int* baseline);
 
