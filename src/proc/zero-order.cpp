@@ -106,7 +106,7 @@ namespace librealsense
 
     }
 
-    void detect_zero_order(const double * rtd, const uint16_t * depth_data_in, const uint8_t * ir_data, uint16_t * depth_data_out,
+    void detect_zero_order(const double * rtd, const uint16_t * depth_data_in, const uint8_t * ir_data, std::function<void(int index, bool zero)> zero_pixel,
         rs2_intrinsics intrinsics, const zero_order_options& options,
        float zo_value, uint8_t iro_value)
     {
@@ -125,16 +125,16 @@ namespace librealsense
 
             if (depth_data_in[i] > 0 && ir_val < i_threshold_relative && rtd_val >(zo_value - options.rtd_low_threshold) && rtd_val < (zo_value + options.rtd_high_threshold))
             {
-                depth_data_out[i] = 0;
+                zero_pixel(i, true);
             }
             else
             {
-                depth_data_out[i] = depth_data_in[i];
+                zero_pixel(i, false);
             }
         }
     }
 
-    bool zero_order_fix(const uint16_t * depth_data_in, const uint8_t * ir_data, uint16_t * depth_data_out,
+    bool zero_order_fix(const uint16_t * depth_data_in, const uint8_t * ir_data, std::function<void(int index, bool zero)> zero_pixel,
         const rs2::vertex* vertices,
         rs2_intrinsics intrinsics,
         const zero_order_options& options)
@@ -147,7 +147,7 @@ namespace librealsense
         if (try_get_zo_rtd_ir_point_values(rtd.data(), depth_data_in, ir_data, intrinsics, 
             options, &rtd_zo_value, &ir_zo_value))
         {
-            detect_zero_order(rtd.data(), depth_data_in, ir_data, depth_data_out, intrinsics, 
+            detect_zero_order(rtd.data(), depth_data_in, ir_data, zero_pixel, intrinsics,
                 options, rtd_zo_value, ir_zo_value);
             return true;
         }
@@ -382,6 +382,8 @@ namespace librealsense
 
     rs2::frame zero_order::process_frame(const rs2::frame_source & source, const rs2::frame & f)
     {
+        std::vector<rs2::frame> result;
+
         if (_first_frame)
         {
             int zo_point_x , zo_point_y;
@@ -398,23 +400,45 @@ namespace librealsense
         auto data = f.as<rs2::frameset>();
         
        //auto start = std::chrono::high_resolution_clock::now();
-        if (!_source_profile)
-            _source_profile = data.get_depth_frame().get_profile();
+        if (!_source_profile_depth)
+            _source_profile_depth = data.get_depth_frame().get_profile();
 
-        if (!_target_profile)
-            _target_profile = _source_profile.clone(_source_profile.stream_type(), _source_profile.stream_index(), _source_profile.format());
+        if (!_target_profile_depth)
+            _target_profile_depth = _source_profile_depth.clone(_source_profile_depth.stream_type(), _source_profile_depth.stream_index(), _source_profile_depth.format());
 
         auto depth_frame = data.get_depth_frame();
         auto ir_frame = data.get_infrared_frame();
+        auto confidence_frame = data.first_or_default(RS2_STREAM_CONFIDENCE);
 
         auto points = _pc.calculate(depth_frame);
 
-        auto out_frame = source.allocate_video_frame(_target_profile, depth_frame, 0, 0, 0, 0, RS2_EXTENSION_DEPTH_FRAME);
+        auto depth_out = source.allocate_video_frame(_target_profile_depth, depth_frame, 0, 0, 0, 0, RS2_EXTENSION_DEPTH_FRAME);
+
+        rs2::frame confidence_out;
+        if (confidence_frame)
+        {
+            if(!_source_profile_confidence)
+                _source_profile_confidence = confidence_frame.get_profile();
+
+            if (!_target_profile_confidence)
+                _target_profile_confidence = _source_profile_confidence.clone(_source_profile_confidence.stream_type(), _source_profile_confidence.stream_index(), _source_profile_confidence.format());
+
+            confidence_out = source.allocate_video_frame(_source_profile_confidence, confidence_frame, 0, 0, 0, 0, RS2_EXTENSION_VIDEO_FRAME);
+        }
         auto depth_intrinsics = depth_frame.get_profile().as<rs2::video_stream_profile>().get_intrinsics();
+
 
         if (zero_order_fix((const uint16_t*)depth_frame.get_data(),
             (const uint8_t*)ir_frame.get_data(),
-            (uint16_t*)out_frame.get_data(),
+            [&](int index, bool zero) 
+        {
+            ((uint16_t*)depth_out.get_data())[index] = zero ? 0 : ((uint16_t *)depth_frame.get_data())[index];
+
+            if (confidence_frame)
+            {
+                ((uint8_t*)confidence_out.get_data())[index] = zero ? 0 : ((uint8_t *)confidence_frame.get_data())[index];
+            }
+        },
             points.get_vertices(),
             depth_intrinsics,
             _options))
@@ -422,12 +446,23 @@ namespace librealsense
             //auto end = std::chrono::high_resolution_clock::now();
             //auto diff = std::chrono::duration<double, std::milli>((end - start));
             //std::cout << diff.count() << std::endl;
-            return out_frame;
+            result.push_back(depth_out);
+            result.push_back(ir_frame);
+            if (confidence_frame)
+                result.push_back(confidence_out);
+
         }
             
         else
-            return f;
+        {
+            result.push_back(depth_frame);
+            result.push_back(ir_frame);
+            if (confidence_frame)
+                result.push_back(confidence_frame);
+        }
+        return source.allocate_composite_frame(result);
     }
+
     bool zero_order::should_process(const rs2::frame& frame)
     {
         if (auto set = frame.as<rs2::frameset>())
@@ -445,11 +480,10 @@ namespace librealsense
         {
             composite.foreach([&](rs2::frame f) 
             {
-                if (f.get_profile().stream_type() != RS2_STREAM_DEPTH)
+                if (f.get_profile().stream_type() != RS2_STREAM_DEPTH && f.get_profile().stream_type() != RS2_STREAM_INFRARED && results.size()>0)
                     results.push_back(f);
             });
         }
-       
         return source.allocate_composite_frame(results);
     }
    

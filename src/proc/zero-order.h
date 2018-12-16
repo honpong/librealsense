@@ -51,8 +51,12 @@ namespace librealsense
         bool try_read_zo_point(const rs2::frame& frame, int* zo_point_x, int* zo_point_y);
         bool try_read_baseline(const rs2::frame& frame, int* baseline);
 
-        rs2::stream_profile     _source_profile;
-        rs2::stream_profile     _target_profile;
+        rs2::stream_profile     _source_profile_depth;
+        rs2::stream_profile     _target_profile_depth;
+
+        rs2::stream_profile     _source_profile_confidence;
+        rs2::stream_profile     _target_profile_confidence;
+
         rs2::pointcloud         _pc;
 
         bool                    _first_frame;
