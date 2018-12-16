@@ -115,6 +115,17 @@ namespace librealsense
         throw not_implemented_exception("enable_recording(...) not implemented!");
     }
 
+    std::vector<tagged_profile> l500_device::get_profiles_tags() const
+    {
+        std::vector<tagged_profile> tags;
+
+        tags.push_back({ RS2_STREAM_DEPTH, -1, 640, 360, RS2_FORMAT_Z16, 30, profile_tag::PROFILE_TAG_SUPERSET | profile_tag::PROFILE_TAG_DEFAULT });
+        tags.push_back({ RS2_STREAM_INFRARED, -1, 640, 360, RS2_FORMAT_Y8, 30, profile_tag::PROFILE_TAG_SUPERSET | profile_tag::PROFILE_TAG_DEFAULT });
+        tags.push_back({ RS2_STREAM_CONFIDENCE, -1, 640, 360, RS2_FORMAT_RAW8, 30, profile_tag::PROFILE_TAG_SUPERSET });
+        
+        return tags;
+    };
+
     void l500_device::force_hardware_reset() const
     {
         command cmd(ivcam2::fw_cmd::HWReset);
@@ -196,8 +207,8 @@ namespace librealsense
 
         if (has_metadata_fc(fo))
         {
-            auto md = (librealsense::metadata_raw*)(fo.metadata);
-            return md->mode.sr300_rgb_mode.frame_counter; // The attribute offset is identical for all sr300-supported streams
+            auto md = (byte*)(fo.metadata);
+            return ((int*)md)[7];
         }
 
         return _backup_timestamp_reader->get_frame_counter(mode, fo);

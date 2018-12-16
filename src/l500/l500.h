@@ -146,14 +146,6 @@ namespace librealsense
     class l500_device final : public virtual device, public debug_interface
     {
     public:
-        std::vector<tagged_profile> get_profiles_tags() const override
-        {
-            std::vector<tagged_profile> tags;
-            tags.push_back({ RS2_STREAM_COLOR, -1, 640, 480, RS2_FORMAT_RGB8, 30, profile_tag::PROFILE_TAG_SUPERSET | profile_tag::PROFILE_TAG_DEFAULT });
-            tags.push_back({ RS2_STREAM_DEPTH, -1, 640, 480, RS2_FORMAT_Z16, 30, profile_tag::PROFILE_TAG_SUPERSET | profile_tag::PROFILE_TAG_DEFAULT });
-            tags.push_back({ RS2_STREAM_INFRARED, -1, 640, 480, RS2_FORMAT_Y8, 30, profile_tag::PROFILE_TAG_SUPERSET });
-            return tags;
-        };
 
         class l500_depth_sensor : public uvc_sensor, public video_sensor_interface, public depth_sensor
         {
@@ -290,7 +282,7 @@ namespace librealsense
 
         void create_snapshot(std::shared_ptr<debug_interface>& snapshot) const override;
         void enable_recording(std::function<void(const debug_interface&)> record_action) override;
-
+        std::vector<tagged_profile> get_profiles_tags() const override;
 
         virtual std::shared_ptr<matcher> create_matcher(const frame_holder& frame) const override;
 
