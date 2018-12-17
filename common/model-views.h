@@ -909,8 +909,12 @@ namespace rs2
 
         void begin_stream(std::shared_ptr<subdevice_model> d, rs2::stream_profile p);
 
-        bool is_3d_texture_source(frame f);
+        std::vector<frame> get_frames(frame set);
+        frame get_3d_depth_source(frame f);
+        frame get_3d_texture_source(frame f);
+
         bool is_3d_depth_source(frame f);
+        bool is_3d_texture_source(frame f);
 
         texture_buffer* upload_frame(frame&& f);
 
