@@ -264,6 +264,7 @@ namespace librealsense
             CASE(STREAM_FILTER)
             CASE(STREAM_FORMAT_FILTER)
             CASE(STREAM_INDEX_FILTER)
+            CASE(EMITTER_ON_OFF)
             CASE(FILTER_ZO_IR_THRESHOLD)
             CASE(FILTER_ZO_RTD_HIGH_THRESHOLD)
             CASE(FILTER_ZO_RTD_LOW_THRESHOLD)

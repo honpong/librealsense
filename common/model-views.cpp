@@ -25,7 +25,6 @@
 
 #define ARCBALL_CAMERA_IMPLEMENTATION
 #include <arcball_camera.h>
-#include "zero_order_fix.h"
 
 constexpr const char* recommended_fw_url = "https://downloadcenter.intel.com/download/27522/Latest-Firmware-for-Intel-RealSense-D400-Product-Family?v=t";
 constexpr const char* store_url = "https://click.intel.com/";
@@ -36,6 +35,18 @@ using namespace nlohmann;
 ImVec4 flip(const ImVec4& c)
 {
     return{ c.y, c.x, c.z, c.w };
+}
+
+// Use shortcuts for long names to avoid trimming of essential data
+std::string     truncate_string(const std::string& str, size_t width)
+{
+    if (str.length() > width)
+    {
+        std::stringstream ss;
+        ss << str.substr(0,width/3) << "..." << str.substr(str.length()-width/3);
+        return ss.str().c_str();
+    }
+    return str;
 }
 
 ImVec4 from_rgba(uint8_t r, uint8_t g, uint8_t b, uint8_t a, bool consistent_color)
@@ -2511,9 +2522,10 @@ namespace rs2
             std::string label = to_string() << "Stream Info of " << profile.unique_id();
             ImGui::Begin(label.c_str(), nullptr, flags);
 
-            label = to_string() << size.x << "x" << size.y << ", "
-                << rs2_format_to_string(profile.format()) << ", "
-                << "FPS:";
+            std::string res;
+            if (profile.as<rs2::video_stream_profile>())
+                res = to_string() << size.x << "x" << size.y << ", ";
+            label = to_string() << res << truncate_string(rs2_format_to_string(profile.format()),9) << ", FPS:";
             ImGui::Text("%s", label.c_str());
             ImGui::SameLine();
 
@@ -2530,7 +2542,7 @@ namespace rs2
 
             ImGui::Columns(2, 0, false);
             ImGui::SetColumnOffset(1, 160);
-            label = to_string() << "Timestamp: " << std::fixed << std::setprecision(3) << timestamp;
+            label = to_string() << "Timestamp: " << std::fixed << std::setprecision(1) << timestamp;
             ImGui::Text("%s", label.c_str());
             ImGui::NextColumn();
 
@@ -3044,7 +3056,7 @@ namespace rs2
         if (ImGui::BeginPopupModal(name.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize))
         {
             ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, regular_blue);
-            ImGui::Text(const_cast<char*>(error_message.c_str()));
+            ImGui::Text("%s", error_message.c_str());
             ImGui::PopStyleColor();
 
             ImGui::PushStyleColor(ImGuiCol_Button, transparent);
@@ -3272,13 +3284,13 @@ namespace rs2
            
         if(viewer.is_3d_view)
         {
-            if(viewer.is_3d_depth_source(f))
+            if(auto depth = viewer.get_3d_depth_source(filtered))
             {
-                res.push_back(pc->calculate(filtered));
+                res.push_back(pc->calculate(depth));
             }
-            if(viewer.is_3d_texture_source(f))
+            if(auto texture = viewer.get_3d_texture_source(filtered))
             {
-                update_texture(filtered);
+                update_texture(texture);
             }
         }
 
@@ -4268,6 +4280,44 @@ namespace rs2
         if (index == selected_tex_source_uid || mapped_index == selected_tex_source_uid || selected_tex_source_uid == -1)
             return true;
         return false;
+    }
+
+    std::vector<frame> rs2::viewer_model::get_frames(frame frame)
+    {
+        std::vector<rs2::frame> res;
+
+        if (auto set = frame.as<frameset>())
+            for (auto&& f : set)
+                res.push_back(f);
+
+        else
+            res.push_back(frame);
+
+        return res;
+    }
+
+    frame viewer_model::get_3d_depth_source(frame f)
+    {
+        auto frames = get_frames(f);
+
+        for (auto&& f : frames)
+        {
+            if (is_3d_depth_source(f))
+                return f;
+        }
+        return nullptr;
+    }
+
+    frame rs2::viewer_model::get_3d_texture_source(frame f)
+    {
+        auto frames = get_frames(f);
+
+        for (auto&& f : frames)
+        {
+            if (is_3d_texture_source(f))
+                return f;
+        }
+        return nullptr;
     }
 
     bool viewer_model::is_3d_depth_source(frame f)
@@ -5496,7 +5546,7 @@ namespace rs2
                                             << opt_model.value << " (" << labels[selected] << ")");
 
                                         opt_model.endpoint->set_option(opt_model.opt, new_val);
-                                        
+
                                         // Only apply preset to GUI if set_option was succesful
                                         selected_file_preset = "";
                                         opt_model.value = new_val;
@@ -5906,12 +5956,13 @@ namespace rs2
                                 {
                                     if(!dev_syncer)
                                         dev_syncer = viewer.syncer->create_syncer();
-                                    
+
                                     std::string friendly_name = sub->s->get_info(RS2_CAMERA_INFO_NAME);
-                                    if (friendly_name.find("Tracking") != std::string::npos)
+                                    if ((friendly_name.find("Tracking") != std::string::npos) ||
+                                        (friendly_name.find("Motion") != std::string::npos))
                                     {
                                         viewer.synchronization_enable = false;
-}
+                                    }
                                     sub->play(profiles, viewer, dev_syncer);
                                 }
                                 catch (const error& e)
