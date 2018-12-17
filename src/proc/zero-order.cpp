@@ -87,16 +87,7 @@ namespace librealsense
 
         }), values_ir.end());
 
-        if (values_rtd.size() == 0)
-            return false;
-
-        std::remove_if(values_ir.begin(), values_ir.end(), [](auto val)
-        {
-            double zero = 0;
-            auto res = val == zero;
-            return !res;
-        });
-        if (values_rtd.size() == 0)
+        if (values_rtd.size() == 0 || values_rtd.size() == 0)
             return false;
 
         *rtd_zo_value = get_zo_point_value(values_rtd);

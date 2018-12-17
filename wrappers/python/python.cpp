@@ -556,6 +556,9 @@ PYBIND11_MODULE(NAME, m) {
     py::class_<rs2::disparity_transform, rs2::processing_block> disparity_transform(m, "disparity_transform");
     disparity_transform.def(py::init<bool>(), "transform_to_disparity"_a=true);
 
+    py::class_<rs2::zero_order_fix, rs2::processing_block> zero_order_fix(m, "zero_order_fix");
+    zero_order_fix.def(py::init<>());
+
     /* rs2_record_playback.hpp */
     py::class_<rs2::playback, rs2::device> playback(m, "playback");
     playback.def(py::init<rs2::device>(), "device"_a)

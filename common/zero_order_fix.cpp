@@ -3,6 +3,7 @@
 #include "../include/librealsense2/hpp/rs_frame.hpp"
 #include "math.h"
 #include <fstream>
+#include <algorithm>
 
 uint16_t get_pixel_rtd(const rs2::vertex v, int baseline)
 {
