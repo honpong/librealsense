@@ -17,14 +17,15 @@ config.enable_stream(rs.stream.infrared, 640, 360, rs.format.y8, 30)
 
 # Start streaming
 pipeline.start(config)
-dec = rs.zero_order_fix()
+zo = rs.zero_order_fix()
 #align = rs.align()
 try:
     while True:
 
         # Wait for a coherent pair of frames: depth and color
         frames = pipeline.wait_for_frames(15000)
-        frames = dec.process(frames).as_frameset()
+	#zo.set_option(rs.option.filter_zo_ir_threshold, 0)
+        frames = zo.process(frames).as_frameset()
         #frames = align.process(frames).as_frameset()
         depth_frame = frames.get_depth_frame()
         #color_frame = frames.get_color_frame()
