@@ -163,13 +163,24 @@ namespace librealsense
     void rotate_270_degrees_clockwise(byte * const dest[], const byte * source, int width, int height)
     {
         auto out = dest[0];
-        for (int i = 0; i < height; ++i)
+        byte buffer[8][8 * SIZE]; // = { 0 };
+        for (int i = 0; i < width; i = i + 8)
         {
-            auto row_offset = i * width;
-            for (int j = 0; j < width; ++j)
+            for (int j = 0; j < height; j = j + 8)
             {
-                auto out_index = ((((width - 1) - j) * height) + i) * SIZE;
-                librealsense::copy((void*)(&out[out_index]), &(source[(row_offset + j) * SIZE]), SIZE);
+                for (int jj = 0; jj < 8; ++jj)
+                {
+                    for (int ii = 0; ii < 8; ++ii)
+                    {
+                        auto source_index = (((width - 1) - i - ii) + (width * (j + jj))) * SIZE;
+                        memcpy((void*)(&buffer[ii][jj * SIZE]), &source[source_index], SIZE);
+                    }
+                }
+                for (int ii = 0; ii < 8; ++ii)
+                {
+                    auto row_offset = ((i + ii)* height);
+                    memcpy(&out[(row_offset + j) * SIZE], &(buffer[ii]), 8 * SIZE);
+                }
             }
         }
     }
