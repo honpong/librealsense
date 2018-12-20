@@ -462,7 +462,7 @@ namespace rs2
         std::shared_ptr<processing_block_model> zero_order_artifact_fix;
 
         std::vector<std::shared_ptr<processing_block_model>> post_processing;
-        bool post_processing_enabled = false;
+        bool post_processing_enabled = true;
         std::vector<std::shared_ptr<processing_block_model>> const_effects;
     };
 

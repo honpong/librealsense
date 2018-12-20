@@ -160,7 +160,7 @@ namespace librealsense
     }
 
     template<size_t SIZE>
-    void rotate_270_degrees_clockwise(byte * const dest[], const byte * source, int width, int height)
+    void rotate_270_degrees_clockwise_optimized(byte * const dest[], const byte * source, int width, int height)
     {
         auto out = dest[0];
         byte buffer[8][8 * SIZE]; // = { 0 };
@@ -181,6 +181,21 @@ namespace librealsense
                     auto row_offset = ((i + ii)* height);
                     memcpy(&out[(row_offset + j) * SIZE], &(buffer[ii]), 8 * SIZE);
                 }
+            }
+        }
+    }
+
+    template<size_t SIZE>
+    void rotate_270_degrees_clockwise(byte * const dest[], const byte * source, int width, int height)
+    {
+        auto out = dest[0];
+        for (int i = 0; i < height; ++i)
+        {
+            auto row_offset = i * width;
+            for (int j = 0; j < width; ++j)
+            {
+                auto out_index = ((((width - 1) - j) * height) + i) * SIZE;
+                librealsense::copy((void*)(&out[out_index]), &(source[(row_offset + j) * SIZE]), SIZE);
             }
         }
     }
@@ -1004,9 +1019,9 @@ namespace librealsense
 
     const native_pixel_format pf_confidence_l500          = { 'C   ', 1, 1, {  { true,                &unpack_confidence,                            { { RS2_STREAM_CONFIDENCE,     RS2_FORMAT_RAW8, l500_confidence_resolution } } },
                                                                                { requires_processing, &copy_pixels<1>,                               { { RS2_STREAM_CONFIDENCE,     RS2_FORMAT_RAW8 } } } } };
-    const native_pixel_format pf_z16_l500                 = { 'Z16 ', 1, 2, {  { true,                &rotate_270_degrees_clockwise<2>,              { { RS2_STREAM_DEPTH,          RS2_FORMAT_Z16,  rotate_resolution } } },
+    const native_pixel_format pf_z16_l500                 = { 'Z16 ', 1, 2, {  { true,                &rotate_270_degrees_clockwise_optimized<2>,              { { RS2_STREAM_DEPTH,          RS2_FORMAT_Z16,  rotate_resolution } } },
                                                                                { requires_processing, &copy_pixels<2>,                               { { RS2_STREAM_DEPTH,          RS2_FORMAT_Z16                    } } } } };
-    const native_pixel_format pf_y8_l500                  = { 'GREY', 1, 1, {  { true,                &rotate_270_degrees_clockwise<1>,              { { RS2_STREAM_INFRARED,       RS2_FORMAT_Y8,   rotate_resolution } } },
+    const native_pixel_format pf_y8_l500                  = { 'GREY', 1, 1, {  { true,                &rotate_270_degrees_clockwise_optimized<1>,              { { RS2_STREAM_INFRARED,       RS2_FORMAT_Y8,   rotate_resolution } } },
                                                                                { requires_processing, &copy_pixels<1>,                               { { RS2_STREAM_INFRARED,       RS2_FORMAT_Y8 } } } } };
     const native_pixel_format pf_y8                       = { 'GREY', 1, 1, {  { requires_processing, &copy_pixels<1>,                             { { { RS2_STREAM_INFRARED, 1 },  RS2_FORMAT_Y8  } } } } };
     const native_pixel_format pf_y16                      = { 'Y16 ', 1, 2, {  { true,                &unpack_y16_from_y16_10,                     { { { RS2_STREAM_INFRARED, 1 },  RS2_FORMAT_Y16 } } } } };
