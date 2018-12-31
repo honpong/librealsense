@@ -30,9 +30,9 @@ namespace librealsense
     std::vector <T> get_zo_point_values(const T * frame_data_in, rs2_intrinsics intrinsics, int zo_point_x, int zo_point_y, int patch_r)
     {
         std::vector<T> values;
-        for (auto i = zo_point_y - 1 - patch_r; i <= (zo_point_y + patch_r); i++)
+        for (auto i = zo_point_y - 1 - patch_r; i <= (zo_point_y + patch_r) && i < intrinsics.height; i++)
         {
-            for (auto j = (zo_point_x - 1 - patch_r); j <= (zo_point_x + patch_r); j++)
+            for (auto j = (zo_point_x - 1 - patch_r); j <= (zo_point_x + patch_r) && i < intrinsics.width; j++)
             {
                 values.push_back(frame_data_in[i*intrinsics.width + j]);
             }
@@ -199,39 +199,7 @@ namespace librealsense
 
         register_option(RS2_OPTION_FILTER_ZO_RTD_LOW_THRESHOLD, rtd_low_threshold);
 
-        auto zo_point_x = std::make_shared<ptr_option<int>>(
-            20,
-            600,
-            1,
-            315,
-            &_options.zo_point_x,
-            "zero order point x");
-        zo_point_x->on_set([zo_point_x](float val)
-        {
-            if (!zo_point_x->is_valid(val))
-                throw invalid_value_exception(to_string()
-                    << "Unsupported zo point x value " << val << " is out of range.");
-   
-        });
-
-        register_option(RS2_OPTION_FILTER_ZO_POINT_X, zo_point_x);
-
-        auto zo_point_y = std::make_shared<ptr_option<int>>(
-            20,
-            440,
-            1,
-            237,
-            &_options.zo_point_y,
-            "zero order point y");
-        zo_point_y->on_set([zo_point_y](float val)
-        {
-            if (!zo_point_y->is_valid(val))
-                throw invalid_value_exception(to_string()
-                    << "Unsupported zo point y value " << val << " is out of range.");
-
-        });
-
-        register_option(RS2_OPTION_FILTER_ZO_POINT_Y, zo_point_y);
+      
 
         auto baseline = std::make_shared<ptr_option<int>>(
             0,
@@ -375,19 +343,56 @@ namespace librealsense
     {
         std::vector<rs2::frame> result;
 
+        auto zo_point_x_def = 0;
+        auto zo_point_y_def = 0;
+
         if (_first_frame)
-        {
-            int zo_point_x , zo_point_y;
-            if (try_read_zo_point(f, &zo_point_x, &zo_point_y))
+        {           
+            if (try_read_zo_point(f, &zo_point_x_def, &zo_point_y_def))
             {
-                get_option(RS2_OPTION_FILTER_ZO_POINT_X).set(_options.zo_point_x);
-                get_option(RS2_OPTION_FILTER_ZO_POINT_Y).set(_options.zo_point_y);
+                _options.zo_point_x = zo_point_x_def;
+                _options.zo_point_y = zo_point_y_def;
             }
+
+            auto zo_point_x = std::make_shared<ptr_option<int>>(
+                20,
+                f.get_profile().as< rs2::video_stream_profile>().width(),
+                1,
+                zo_point_x_def,
+                &_options.zo_point_x,
+                "zero order point x");
+            zo_point_x->on_set([zo_point_x](float val)
+            {
+                if (!zo_point_x->is_valid(val))
+                    throw invalid_value_exception(to_string()
+                        << "Unsupported zo point x value " << val << " is out of range.");
+
+            });
+
+            register_option(RS2_OPTION_FILTER_ZO_POINT_X, zo_point_x);
+
+            auto zo_point_y = std::make_shared<ptr_option<int>>(
+                20,
+                f.get_profile().as< rs2::video_stream_profile>().height(),
+                1,
+                zo_point_y_def,
+                &_options.zo_point_y,
+                "zero order point y");
+            zo_point_y->on_set([zo_point_y](float val)
+            {
+                if (!zo_point_y->is_valid(val))
+                    throw invalid_value_exception(to_string()
+                        << "Unsupported zo point y value " << val << " is out of range.");
+
+            });
+
+            register_option(RS2_OPTION_FILTER_ZO_POINT_Y, zo_point_y);
+
             int baseline;
             try_read_baseline(f, &baseline);
             _first_frame = false;
         }
-       
+     
         auto data = f.as<rs2::frameset>();
         
        //auto start = std::chrono::high_resolution_clock::now();
@@ -459,7 +464,12 @@ namespace librealsense
         if (auto set = frame.as<rs2::frameset>())
         {
             if (!set.get_depth_frame() || !set.get_infrared_frame())
+            {
                 return false;
+            }
+            if (!_first_frame && (_options.zo_point_x == 0 || _options.zo_point_y == 0))
+                return false;
+
             return true;
         }
         return false;
