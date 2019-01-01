@@ -345,13 +345,14 @@ namespace librealsense
 
         auto zo_point_x_def = 0;
         auto zo_point_y_def = 0;
-
+        auto w = f.get_profile().as<rs2::video_stream_profile>().width();
+        auto h = f.get_profile().as<rs2::video_stream_profile>().height();
         if (_first_frame)
         {           
             if (try_read_zo_point(f, &zo_point_x_def, &zo_point_y_def))
             {
-                _options.zo_point_x = zo_point_x_def;
-                _options.zo_point_y = zo_point_y_def;
+                _options.zo_point_x = w - zo_point_x_def; //WA to bug on calibration
+                _options.zo_point_y = h - zo_point_y_def; //WA to bug on calibration
             }
 
             auto zo_point_x = std::make_shared<ptr_option<int>>(
