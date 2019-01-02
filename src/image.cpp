@@ -162,24 +162,32 @@ namespace librealsense
     template<size_t SIZE>
     void rotate_270_degrees_clockwise_optimized(byte * const dest[], const byte * source, int width, int height)
     {
+        //return rotate_270_degrees_clockwise<SIZE>(dest, source, width, height);
+            auto width_out = height;
+        auto height_out = width;
+
         auto out = dest[0];
         byte buffer[8][8 * SIZE]; // = { 0 };
-        for (int i = 0; i < width; i = i + 8)
+        for (int i = 0; i < height-8; i = i + 8)
         {
-            for (int j = 0; j < height; j = j + 8)
+            for (int j = 0; j < width-8; j = j + 8)
             {
-                for (int jj = 0; jj < 8; ++jj)
-                {
-                    for (int ii = 0; ii < 8; ++ii)
-                    {
-                        auto source_index = (((width - 1) - i - ii) + (width * (j + jj))) * SIZE;
-                        memcpy((void*)(&buffer[ii][jj * SIZE]), &source[source_index], SIZE);
-                    }
-                }
                 for (int ii = 0; ii < 8; ++ii)
                 {
-                    auto row_offset = ((i + ii)* height);
-                    memcpy(&out[(row_offset + j) * SIZE], &(buffer[ii]), 8 * SIZE);
+                    for (int jj = 0; jj < 8; ++jj)
+                    {
+                        auto source_index = ((j+ jj) + (width * (i + ii))) * SIZE;
+                        memcpy((void*)(&buffer[7-jj][(7-ii) * SIZE]), &source[source_index], SIZE);
+                    }
+                }
+
+
+                for (int ii = 0; ii < 8; ++ii)
+                {
+                    auto out_index = (((height_out - 8-j) * width_out) - i-8 +(ii)* width_out-1) ;
+                    if( out_index<=0)
+                     auto row_offset =  8;
+                    memcpy(&out[(out_index) * SIZE], &(buffer[ii]), 8 * SIZE);
                 }
             }
         }
@@ -188,13 +196,16 @@ namespace librealsense
     template<size_t SIZE>
     void rotate_270_degrees_clockwise(byte * const dest[], const byte * source, int width, int height)
     {
+        auto width_out = height;
+        auto height_out = width;
+
         auto out = dest[0];
         for (int i = 0; i < height; ++i)
         {
             auto row_offset = i * width;
             for (int j = 0; j < width; ++j)
             {
-                auto out_index = ((((width - 1) - j) * height) + i) * SIZE;
+                auto out_index = (((height_out - j) * width_out) - i - 1) * SIZE;
                 librealsense::copy((void*)(&out[out_index]), &(source[(row_offset + j) * SIZE]), SIZE);
             }
         }
