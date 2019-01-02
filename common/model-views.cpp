@@ -689,7 +689,15 @@ namespace rs2
     {
         try
         {
-            supported = endpoint->supports(opt);
+            auto support = endpoint->supports(opt);
+            if (support && !supported && _owner)
+            {
+                range = _owner->get_option_range(opt);
+                read_only = _owner->is_option_read_only(opt);
+                if (!read_only)
+                    value = _owner->get_option(opt);
+            }
+            supported = support;
         }
         catch (const error& e)
         {
@@ -768,7 +776,7 @@ namespace rs2
     {
         for (auto i = 0; i < RS2_OPTION_COUNT; i++)
         {
-            option_model metadata;
+            option_model metadata(options.get());
             auto opt = static_cast<rs2_option>(i);
 
             std::stringstream ss;

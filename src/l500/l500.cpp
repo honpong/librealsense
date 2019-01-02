@@ -8,6 +8,8 @@
 #include "l500.h"
 #include "l500-private.h"
 
+#define MM_TO_METER 1/1000
+
 namespace librealsense
 {
     std::shared_ptr<device_interface> l500_info::create(std::shared_ptr<context> ctx,
@@ -59,8 +61,26 @@ namespace librealsense
 
     std::vector<uint8_t> l500_device::get_raw_calibration_table() const
     {
-        command cmd(ivcam2::fw_cmd::DPT_INTRINSICS_GET);
-        return _hw_monitor->send(cmd);
+       /* command cmd(ivcam2::fw_cmd::DPT_INTRINSICS_GET);
+        auto res = _hw_monitor->send(cmd);*/
+
+        //WA untill fw will fix DPT_INTRINSICS_GET command
+        command cmd_fx(0x01, 0xa00e0804, 0xa00e0808);
+        command cmd_fy(0x01, 0xa00e080c, 0xa00e0810);
+        command cmd_cx(0x01, 0xa00e0814, 0xa00e0818);
+        command cmd_cy(0x01, 0xa00e0818, 0xa00e081c);
+        auto fx = _hw_monitor->send(cmd_fx); // CBUFspare_000
+        auto fy = _hw_monitor->send(cmd_fy); // CBUFspare_002
+        auto cx = _hw_monitor->send(cmd_cx); // CBUFspare_004
+        auto cy = _hw_monitor->send(cmd_cy); // CBUFspare_005
+
+        std::vector<uint8_t> vec;
+        vec.insert(vec.end(), fx.begin(), fx.end());
+        vec.insert(vec.end(), cx.begin(), cx.end());
+        vec.insert(vec.end(), fy.begin(), fy.end());
+        vec.insert(vec.end(), cy.begin(), cy.end());
+
+        return vec;
     }
 
     l500_device::l500_device(std::shared_ptr<context> ctx,
@@ -104,6 +124,11 @@ namespace librealsense
         register_info(RS2_CAMERA_INFO_PHYSICAL_PORT, group.uvc_devices.front().device_path);
         register_info(RS2_CAMERA_INFO_PRODUCT_ID, pid_hex_str);
 
+       
+        get_depth_sensor().register_option(RS2_OPTION_DEPTH_UNITS, std::make_shared<const_value_option>("Number of meters represented by a single depth unit",
+            lazy<float>([&]() {
+            return read_znorm(); })));
+       
         environment::get_instance().get_extrinsics_graph().register_same_extrinsics(*_depth_stream, *_ir_stream);
         environment::get_instance().get_extrinsics_graph().register_same_extrinsics(*_depth_stream, *_confidence_stream);
     }
@@ -182,6 +207,14 @@ namespace librealsense
         auto data = (float*)res.data();
         return *data;
     }
+
+    float l500_device::read_znorm()
+    {
+        auto res = _hw_monitor->send(command(0x01, 0xa00e0b08, 0xa00e0b0c));
+        auto znorm = *(float*)res.data();
+        return 1/znorm* MM_TO_METER;
+    }
+
     rs2_time_t l500_timestamp_reader_from_metadata::get_frame_timestamp(const request_mapping& mode, const platform::frame_object& fo)
     {
         std::lock_guard<std::recursive_mutex> lock(_mtx);

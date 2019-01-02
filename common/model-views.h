@@ -201,6 +201,9 @@ namespace rs2
     class option_model
     {
     public:
+        option_model(options* owner = nullptr)
+            :_owner(owner)
+        {}
         bool draw(std::string& error_message, notifications_model& model,bool new_line=true, bool use_option_name = true);
         void update_supported(std::string& error_message);
         void update_read_only_status(std::string& error_message);
@@ -222,6 +225,7 @@ namespace rs2
         std::function<bool(option_model&, std::string&, notifications_model&)> custom_draw_method = nullptr;
         bool edit_mode = false;
         std::string edit_value = "";
+        options* _owner;
     private:
         bool is_all_integers() const;
         bool is_enum() const;
