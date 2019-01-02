@@ -256,9 +256,6 @@ namespace librealsense
                     ivcam2::depth_xu,
                     ivcam2::IVCAM2_DEPTH_LASER_POWER, "Power of the l500 projector, with 0 meaning projector off"));
 
-            depth_ep->register_option(RS2_OPTION_DEPTH_UNITS, std::make_shared<const_value_option>("Number of meters represented by a single depth unit",
-                lazy<float>([]() {
-                return 0.000125f; })));
             return depth_ep;
         }
 
@@ -289,6 +286,7 @@ namespace librealsense
         void read_zo_point(int* zo_x, int* zo_y);
         int  read_algo_version();
         float  read_baseline();
+        float  read_znorm();
 
     private:
         const uint8_t _depth_device_idx;
