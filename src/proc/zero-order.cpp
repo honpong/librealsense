@@ -61,6 +61,10 @@ namespace librealsense
         rs2_intrinsics intrinsics, const zero_order_options& options,
         double *rtd_zo_value, uint8_t* ir_zo_data)
     {
+        if (options.zo_point_x - options.patch_size < 0 || options.zo_point_x + options.patch_size >= intrinsics.width ||
+            options.zo_point_y - options.patch_size < 0 || options.zo_point_y + options.patch_size >= intrinsics.height)
+            return false;
+
         auto values_rtd = get_zo_point_values(rtd, intrinsics, options.zo_point_x, options.zo_point_y, options.patch_size);
         auto values_ir = get_zo_point_values(ir_data, intrinsics, options.zo_point_x, options.zo_point_y, options.patch_size);
         auto values_z = get_zo_point_values(depth_data_in, intrinsics, options.zo_point_x, options.zo_point_y, options.patch_size);
@@ -467,6 +471,13 @@ namespace librealsense
             {
                 return false;
             }
+            auto depth_frame = set.get_depth_frame();
+
+            if (!_first_frame &&
+                (_options.zo_point_x - _options.patch_size < 0 || _options.zo_point_x + _options.patch_size >= depth_frame.get_width() ||
+                _options.zo_point_y - _options.patch_size < 0 || _options.zo_point_y + _options.patch_size >= depth_frame.get_height()))
+                return false;
+
             if (!_first_frame && (_options.zo_point_x == 0 || _options.zo_point_y == 0))
                 return false;
 
