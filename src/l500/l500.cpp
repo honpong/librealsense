@@ -131,6 +131,9 @@ namespace librealsense
        
         environment::get_instance().get_extrinsics_graph().register_same_extrinsics(*_depth_stream, *_ir_stream);
         environment::get_instance().get_extrinsics_graph().register_same_extrinsics(*_depth_stream, *_confidence_stream);
+
+        register_stream_to_extrinsic_group(*_depth_stream, 0);
+        register_stream_to_extrinsic_group(*_ir_stream, 0);
     }
 
     void l500_device::create_snapshot(std::shared_ptr<debug_interface>& snapshot) const
