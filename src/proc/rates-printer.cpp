@@ -2,6 +2,7 @@
 // Copyright(c) 2018 Intel Corporation. All Rights Reserved.
 
 #include "rates-printer.h"
+#include <iostream>
 
 namespace librealsense
 {
