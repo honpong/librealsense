@@ -5,10 +5,15 @@ cmake_minimum_required(VERSION 3.1.0)
 
 project(rs-slam)
 
+find_package(tracker QUIET)
+if (NOT TARGET tracker)
+    return()
+endif()
+
 if(BUILD_EXAMPLES)
     add_executable(${PROJECT_NAME} rs-slam.cpp)
     set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 11)
-    target_link_libraries(${PROJECT_NAME} ${DEPENDENCIES})
+    target_link_libraries(${PROJECT_NAME} ${DEPENDENCIES} tracker)
     set_target_properties (${PROJECT_NAME} PROPERTIES FOLDER Examples)
     install(TARGETS ${PROJECT_NAME} RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
