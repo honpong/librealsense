@@ -103,7 +103,7 @@ int main(int argc, char * argv[]) try
         int cameras = 0, accels = 0, gyros = 0, depths = 0;
         rs2_stream prev_image_type; int prev_image_id = -2;
         for (rs2::stream_profile &s : pipeline_profile.get_streams()) {
-            auto ex = rc_from_rs(s.get_extrinsics_to(pipeline_profile.get_stream(RS2_STREAM_POSE, 0)));
+            auto ex = rc_from_rs(s.get_extrinsics_to(ref));
             std::cout << s.stream_name() << "\n";
             switch (s.stream_type()) {
             case RS2_STREAM_POSE: break; // added only for the extrinsics reference
