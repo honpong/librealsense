@@ -59,12 +59,14 @@ static rc_CameraIntrinsics rc_from_rs(rs2_intrinsics rs) {
     rc.f_x_px = rs.fx;
     rc.f_y_px = rs.fy;
     switch (rs.model) {
-        case RS2_DISTORTION_NONE:            rc.type = rc_CALIBRATION_TYPE_UNDISTORTED;     for (int i = 0; i < 0; i++) rc.distortion[i] = rs.coeffs[i]; break;
+        case RS2_DISTORTION_NONE: all_zero:  rc.type = rc_CALIBRATION_TYPE_UNDISTORTED;     for (int i = 0; i < 0; i++) rc.distortion[i] = rs.coeffs[i]; break;
         case RS2_DISTORTION_FTHETA:          rc.type = rc_CALIBRATION_TYPE_FISHEYE;         for (int i = 0; i < 1; i++) rc.distortion[i] = rs.coeffs[i]; break;
         case RS2_DISTORTION_KANNALA_BRANDT4: rc.type = rc_CALIBRATION_TYPE_KANNALA_BRANDT4; for (int i = 0; i < 4; i++) rc.distortion[i] = rs.coeffs[i]; break;
         case RS2_DISTORTION_MODIFIED_BROWN_CONRADY:
         case RS2_DISTORTION_INVERSE_BROWN_CONRADY:
-        default:
+        case RS2_DISTORTION_BROWN_CONRADY:
+            for (auto c : rs.coeffs) if (c) goto non_zero; goto all_zero;
+        default: non_zero:
             throw std::runtime_error((std::stringstream() << "unknown distortion model " << rs.model).str());
     }
     return rc;
