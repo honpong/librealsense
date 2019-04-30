@@ -11,6 +11,12 @@
 #include <unordered_map>
 #include "rc_tracker.h"
 
+struct to_string {
+    std::ostringstream ss;
+    template<class T> to_string & operator << (const T & val) { ss << val; return *this; }
+    operator std::string() const { return ss.str(); }
+};
+
 static rc_Extrinsics rc_from_rs(rs2_extrinsics rs) {
     rc_Extrinsics rc = {};
     for (int r = 0; r < 3; r++) {
@@ -68,7 +74,7 @@ static rc_CameraIntrinsics rc_from_rs(rs2_intrinsics rs) {
         case RS2_DISTORTION_BROWN_CONRADY:
             for (auto c : rs.coeffs) if (c) goto non_zero; goto all_zero;
         default: non_zero:
-            throw std::runtime_error((std::stringstream() << "unknown distortion model " << rs.model).str());
+            throw std::runtime_error(to_string() << "unknown distortion model " << rs.model);
     }
     return rc;
 }
@@ -112,13 +118,13 @@ int main(int argc, char * argv[]) try
             case RS2_STREAM_INFRARED: {
                 rc_CameraIntrinsics in = rc_from_rs(s.as<rs2::video_stream_profile>().get_intrinsics());
                 if (s.format() != RS2_FORMAT_Y8)
-                    throw std::runtime_error((std::stringstream() << "unsupported image format " << s) .str());
+                    throw std::runtime_error(to_string() << "unsupported image format " << s);
                 if (!rc_configureCamera(rc.get(), cameras, rc_FORMAT_GRAY8, &ex, &in))
-                    throw std::runtime_error((std::stringstream() << "unabled to configure camera " << s) .str());
+                    throw std::runtime_error(to_string() << "unabled to configure camera " << s);
                 auto v = s.as<rs2::video_stream_profile>();
                 if (prev_image_id/2 == cameras/2 && prev_image_type == v.stream_type())
                     if (!rc_configureStereo(rc.get(), prev_image_id, cameras))
-                        throw std::runtime_error((std::stringstream() << "error configuring stereo streams" << s).str());
+                        throw std::runtime_error(to_string() << "error configuring stereo streams" << s);
                 prev_image_type = v.stream_type();
                 prev_image_id = cameras;
                 sensor_id[s.unique_id()] = cameras++;
@@ -126,30 +132,30 @@ int main(int argc, char * argv[]) try
             case RS2_STREAM_DEPTH: {
                 rc_CameraIntrinsics in = rc_from_rs(s.as<rs2::video_stream_profile>().get_intrinsics());
                 if (s.format() != RS2_FORMAT_Z16)
-                    throw std::runtime_error((std::stringstream() << "unsupported image format " << s) .str());
+                    throw std::runtime_error(to_string() << "unsupported image format " << s);
                 if (!rc_configureCamera(rc.get(), depths, rc_FORMAT_DEPTH16, &ex, &in))
-                    throw std::runtime_error((std::stringstream() << "unabled to configure camera " << s) .str());
+                    throw std::runtime_error(to_string() << "unabled to configure camera " << s);
                 sensor_id[s.unique_id()] = depths++;
             }   break;
             case RS2_STREAM_ACCEL: {
                 auto in = rc_from_rs<rc_AccelerometerIntrinsics>(s.as<rs2::motion_stream_profile>().get_motion_intrinsics());
                 if (!rc_configureAccelerometer(rc.get(), accels, &ex, &in))
-                    throw std::runtime_error((std::stringstream() << "unabled to configure accelerometer " << s).str());
+                    throw std::runtime_error(to_string() << "unabled to configure accelerometer " << s);
                 sensor_id[s.unique_id()] = accels++;
             }   break;
             case RS2_STREAM_GYRO: {
                 auto in = rc_from_rs<rc_GyroscopeIntrinsics>(s.as<rs2::motion_stream_profile>().get_motion_intrinsics());
                 if (!rc_configureGyroscope(rc.get(), gyros, &ex, &in))
-                    throw std::runtime_error((std::stringstream() << "unabled to configure gyroscope " << s).str());
+                    throw std::runtime_error(to_string() << "unabled to configure gyroscope " << s);
                 sensor_id[s.unique_id()] = gyros++;
             }   break;
             default:
-                throw std::runtime_error((std::stringstream() << "unknown stream type configred for slam: " << s.stream_name()).str());
+                throw std::runtime_error(to_string() << "unknown stream type configred for slam: " << s.stream_name());
             }
         }
         if (accels < 1 || gyros < 1 || cameras < 1)
-            throw std::runtime_error((std::stringstream() << "slam requires at least one grey scale camera, one gyroscope and one accelerometer."
-                                      " found "<< cameras << " camera(s), " << gyros << " gyroscope(s), " << accels << " accelerometer(s).").str());
+            throw std::runtime_error(to_string() << "slam requires at least one grey scale camera, one gyroscope and one accelerometer."
+                                      " found "<< cameras << " camera(s), " << gyros << " gyroscope(s), " << accels << " accelerometer(s).");
     }
 
     {
@@ -183,7 +189,7 @@ int main(int argc, char * argv[]) try
                                       f0.get_width(), f0.get_height(), f0.get_stride_in_bytes(), f1.get_stride_in_bytes(),
                                       f0.get_data(), f1.get_data(),
                                       [](void *f){ delete (rs2::frameset*)f; }, (void*)new rs2::frameset(fs)))
-                    throw std::runtime_error((std::stringstream() << "failed stereo receive for frame " << fs).str());
+                    throw std::runtime_error(to_string() << "failed stereo receive for frame " << fs);
             } else {
                 for (const rs2::frame &frame : frame.as<rs2::frameset>()) {
                     auto s = frame.get_profile();
@@ -195,9 +201,9 @@ int main(int argc, char * argv[]) try
                                              v.get_height(), v.get_width(), v.get_stride_in_bytes(),
                                              v.get_data(),
                                              [](void *f){ delete (rs2::frame*)f; }, (void*)new rs2::frame(frame)))
-                            throw std::runtime_error((std::stringstream() << "failed receive for frame " << frame).str());
+                            throw std::runtime_error(to_string() << "failed receive for frame " << frame);
                     } else
-                        throw  std::runtime_error((std::stringstream() << "unexpected frameset " << frame).str());
+                        throw  std::runtime_error(to_string() << "unexpected frameset " << frame);
                 }
             }
         } else {
@@ -210,17 +216,17 @@ int main(int argc, char * argv[]) try
                                      v.get_height(), v.get_width(), v.get_stride_in_bytes(),
                                      v.get_data(),
                                      [](void *f){ delete (rs2::frame*)f; }, (void*)new rs2::frame(frame)))
-                    throw std::runtime_error((std::stringstream() << "failed receive for frame " << frame).str());
+                    throw std::runtime_error(to_string() << "failed receive for frame " << frame);
             } else if (s.format() == RS2_FORMAT_MOTION_XYZ32F) {
                 const auto &m = frame.as<rs2::motion_frame>();
                 const auto &p = s.as<rs2::motion_stream_profile>();
                 const auto d = m.get_motion_data();
                 if (s.stream_type() == RS2_STREAM_GYRO) {
                     if (!rc_receiveGyro(rc.get(), sensor_id[p.unique_id()], to_rc_Timestamp(m), rc_Vector{{ d.x, d.y, d.z }}))
-                        throw std::runtime_error((std::stringstream() << "failed receive for frame " << frame).str());
+                        throw std::runtime_error(to_string() << "failed receive for frame " << frame);
                 } else if (s.stream_type() == RS2_STREAM_ACCEL) {
                     if (!rc_receiveAccelerometer(rc.get(), sensor_id[p.unique_id()], to_rc_Timestamp(m), rc_Vector{{ d.x, d.y, d.z }}))
-                        throw std::runtime_error((std::stringstream() << "failed receive for frame " << frame).str());
+                        throw std::runtime_error(to_string() << "failed receive for frame " << frame);
                 }
             }
         }
