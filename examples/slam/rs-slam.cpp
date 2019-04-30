@@ -4,6 +4,7 @@
 #include <iostream>
 #include <sstream>
 #include <thread>
+#include <cassert>
 #include <iomanip>
 #include <memory>
 #include <fstream>
