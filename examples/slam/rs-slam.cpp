@@ -114,6 +114,8 @@ int main(int argc, char * argv[]) try
     rs2::pipeline_profile pipeline_profile = cfg.resolve(pipe);
     std::unordered_map<int,int> sensor_id;
 
+    rc_setMessageCallback(rc.get(), [](void *handle, rc_MessageLevel message_level, const char *message, size_t len) { std::cout.write(message,len); }, nullptr, rc_MESSAGE_INFO);
+
     rs2::stream_profile ref; try { ref = pipeline_profile.get_stream(RS2_STREAM_POSE); } catch (...) { ref = pipeline_profile.get_stream(RS2_STREAM_ACCEL); };
 
     {
