@@ -1,6 +1,7 @@
 // License: Apache 2.0. See LICENSE file in root directory.
 // Copyright(c) 2019 Intel Corporation. All Rights Reserved.
 #include <librealsense2/rs.hpp>
+#include <librealsense2/hpp/rs_internal.hpp>
 #include <iostream>
 #include <sstream>
 #include <thread>
@@ -177,6 +178,64 @@ int main(int argc, char * argv[]) try
     }
 
     rc_configureQueueStrategy(rc.get(), rc_QUEUE_MINIMIZE_LATENCY);
+
+    rs2::software_device dev;
+    struct rc_software_pose {
+        rs2::software_sensor pose_sensor;
+        rs2::stream_profile pose_stream;
+        rc_DataPath path;
+        rc_SensorType output_type;
+        int frame_number = 0;
+        rc_software_pose(const char *name, rs2::software_device &dev, const rs2::stream_profile &ref, int output_fps, rc_SensorType output_type_, rc_Tracker *tracker, rc_DataPath path_)
+            : pose_sensor(dev.add_sensor(name)),
+              pose_stream(pose_sensor.add_pose_stream({ RS2_STREAM_POSE, 0 /*index???*/, 0 /*unique_id???*/, output_fps, RS2_FORMAT_6DOF })),
+              path(path_), output_type(output_type_) {
+          pose_stream.register_extrinsics_to(ref, {{1, 0, 0, 0, 1, 0, 0, 0, 1}, {0,0,0}});
+          //pose_sensor.open(pose_stream);
+        }
+        static void data_callback(void *handle, rc_Tracker *tracker, const rc_Data *data) {
+          auto &sp = *(rc_software_pose *)handle;
+          if (data->path == sp.path && data->type == sp.output_type) {
+              rc_PoseVelocity v;
+              rc_PoseAcceleration a;
+              rc_PoseTime pose_time = rc_getPose(tracker, &v, &a, data->path);
+
+              rs2_software_pose_frame::pose_frame_info pose = {};
+              for (int i=0; i<4; i++)
+                pose.rotation[i] = pose_time.pose_m.Q.v[i];
+              for (int i=0; i<3; i++) {
+                pose.translation[i] = pose_time.pose_m.T.v[i];
+                pose.velocity[i] = v.T.v[i];
+                pose.acceleration[i] = a.T.v[i];
+                pose.angular_velocity[i] = v.W.v[i];
+                pose.angular_acceleration[i] = a.W.v[i];
+              }
+              pose.tracker_confidence = rc_getConfidence(tracker);
+              //pose.mapper_confidence = ;
+
+              rs2_software_pose_frame frame = {};
+              frame.data = (void *)new rs2_software_pose_frame::pose_frame_info(pose);
+              frame.deleter = [](void *pf) { delete (rs2_software_pose_frame::pose_frame_info *)pf; };
+              frame.timestamp = (double)pose_time.time_us / 1000;
+              frame.domain = RS2_TIMESTAMP_DOMAIN_SYSTEM_TIME; // FIXME: this should come from the input sensors
+              frame.frame_number = sp.frame_number++;
+              frame.profile = sp.pose_stream.get();
+
+              sp.pose_sensor.on_pose_frame(frame);
+          }
+        }
+    };
+
+    int output_fps = pipeline_profile.get_stream(RS2_STREAM_GYRO).fps(); // we choose to output pose on the gyro, see rc_setDataCallback
+    struct fast_slow { rc_software_pose fast, slow; } fast_slow = {
+        {"Slow Pose", dev, ref, output_fps / 2, rc_SENSOR_TYPE_GYROSCOPE, rc.get(), rc_DATA_PATH_SLOW},
+        {"Fast Pose", dev, ref, output_fps,     rc_SENSOR_TYPE_GYROSCOPE, rc.get(), rc_DATA_PATH_FAST},
+    };
+    rc_setDataCallback(rc.get(), [](void *handle, rc_Tracker *tracker, const rc_Data *data) {
+        auto &fs = *(struct fast_slow*)handle;
+        if      (data->path == rc_DATA_PATH_FAST) rc_software_pose::data_callback((void*)&fs.fast, tracker, data);
+        else if (data->path == rc_DATA_PATH_SLOW) rc_software_pose::data_callback((void*)&fs.slow, tracker, data);
+    }, (void *)&fast_slow);
 
     // either or both of these
     rc_startCapture(rc.get(), rc_RUN_ASYNCHRONOUS, [](void *handle, const void *buffer, size_t length) {
