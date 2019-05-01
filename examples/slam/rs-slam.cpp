@@ -36,8 +36,8 @@ static typename std::enable_if<std::is_same<rc_GyroscopeIntrinsics,In>::value,rc
         for (int j=0; j<3; j++)
             rc.scale_and_alignment.v[i][j]    = rs.data[i][j];
         rc.bias_rad__s.v[i]                   = rs.data[i][3];
-        rc.bias_variance_rad2__s2.v[i]        = rs.bias_variances[i];
-        rc.measurement_variance_rad2__s2     += rs.noise_variances[i];
+        rc.bias_variance_rad2__s2.v[i]        = rs.bias_variances[i] ? rs.bias_variances[i] : 1e-4f;
+        rc.measurement_variance_rad2__s2     += rs.noise_variances[i] ? rs.noise_variances[i] : 0.000005148030140844639;
     }
     rc.measurement_variance_rad2__s2 /= 3;
     return rc;
@@ -50,8 +50,8 @@ static typename std::enable_if<std::is_same<rc_AccelerometerIntrinsics,In>::valu
         for (int j=0; j<3; j++)
             rc.scale_and_alignment.v[i][j]   = rs.data[i][j];
         rc.bias_m__s2.v[i]                   = rs.data[i][3];
-        rc.bias_variance_m2__s4.v[i]         = rs.bias_variances[i];
-        rc.measurement_variance_m2__s4      += rs.noise_variances[i];
+        rc.bias_variance_m2__s4.v[i]         = rs.bias_variances[i]  ? rs.bias_variances[i] : 1e-3f;
+        rc.measurement_variance_m2__s4      += rs.noise_variances[i] ? rs.noise_variances[i] : 0.00006695245247101411;
     }
     rc.measurement_variance_m2__s4 /= 3;
     return rc;
