@@ -79,6 +79,19 @@ static rc_CameraIntrinsics rc_from_rs(rs2_intrinsics rs) {
     return rc;
 }
 
+static rc_Timestamp to_rc_Timestamp(const rs2::frame &f) {
+    return rc_Timestamp(1000*f.get_timestamp());
+}
+
+static std::pair<rc_Timestamp,rc_Timestamp> to_rc_Timestamp_and_exposure(const rs2::frame &f) {
+    if (f.supports_frame_metadata(RS2_FRAME_METADATA_ACTUAL_EXPOSURE))
+        return std::make_pair(1000*f.get_timestamp(), f.get_frame_metadata(RS2_FRAME_METADATA_ACTUAL_EXPOSURE));
+    else if (f.supports_frame_metadata(RS2_FRAME_METADATA_SENSOR_TIMESTAMP))
+        return std::make_pair(f.get_frame_metadata(RS2_FRAME_METADATA_SENSOR_TIMESTAMP), 0);
+    else
+        throw std::runtime_error(to_string() << "unable to determine exposure time of " << f);
+}
+
 int main(int argc, char * argv[]) try
 {
     rs2::context ctx;
@@ -100,9 +113,6 @@ int main(int argc, char * argv[]) try
     std::unique_ptr<rc_Tracker, void (*)(rc_Tracker *)> rc = { rc_create(), rc_destroy };
     rs2::pipeline_profile pipeline_profile = cfg.resolve(pipe);
     std::unordered_map<int,int> sensor_id;
-    auto to_rc_Timestamp = [](const rs2::frame &f) -> rc_Timestamp {
-        return rc_Timestamp(1000*f.get_timestamp());
-    };
 
     rs2::stream_profile ref; try { ref = pipeline_profile.get_stream(RS2_STREAM_POSE); } catch (...) { ref = pipeline_profile.get_stream(RS2_STREAM_ACCEL); };
 
@@ -176,7 +186,7 @@ int main(int argc, char * argv[]) try
     //rc_setOutputLog(rc.get(), "/tmp/t.rc", rc_RUN_ASYNCHRONOUS);
     //rc_startTracker(rc.get(), rc_RUN_ASYNCHRONOUS);
 
-    pipe.start(cfg, [&rc,&sensor_id,&to_rc_Timestamp](const rs2::frame& frame) {
+    pipe.start(cfg, [&rc,&sensor_id](const rs2::frame& frame) {
         try {
         if (frame.is<rs2::frameset>()) {
             auto fs = frame.as<rs2::frameset>();
@@ -185,7 +195,7 @@ int main(int argc, char * argv[]) try
                 auto f1 = fs[1].as<rs2::video_frame>(); auto p1 = f0.get_profile().as<rs2::video_stream_profile>(); auto id1 = sensor_id[p1.unique_id()];
                 assert(id0/2 == id1/2);
                 if (!rc_receiveStereo(rc.get(), id0/2, rc_FORMAT_GRAY8,
-                                      to_rc_Timestamp(fs), (rc_Timestamp)fs.get_frame_metadata(RS2_FRAME_METADATA_ACTUAL_EXPOSURE),
+                                      to_rc_Timestamp_and_exposure(fs).first, to_rc_Timestamp_and_exposure(fs).second,
                                       f0.get_width(), f0.get_height(), f0.get_stride_in_bytes(), f1.get_stride_in_bytes(),
                                       f0.get_data(), f1.get_data(),
                                       [](void *f){ delete (rs2::frameset*)f; }, (void*)new rs2::frameset(fs)))
@@ -197,7 +207,7 @@ int main(int argc, char * argv[]) try
                         const auto &v = frame.as<rs2::video_frame>();
                         const auto &p = s.as<rs2::video_stream_profile>();
                         if (!rc_receiveImage(rc.get(), sensor_id[p.unique_id()], p.format() == RS2_FORMAT_Y8 ? rc_FORMAT_GRAY8 : rc_FORMAT_DEPTH16,
-                                             to_rc_Timestamp(v), (rc_Timestamp)v.get_frame_metadata(RS2_FRAME_METADATA_ACTUAL_EXPOSURE),
+                                             to_rc_Timestamp_and_exposure(v).first, to_rc_Timestamp_and_exposure(v).second,
                                              v.get_height(), v.get_width(), v.get_stride_in_bytes(),
                                              v.get_data(),
                                              [](void *f){ delete (rs2::frame*)f; }, (void*)new rs2::frame(frame)))
@@ -212,7 +222,7 @@ int main(int argc, char * argv[]) try
                 const rs2::video_frame &v = frame.as<rs2::video_frame>();
                 const rs2::video_stream_profile &p = s.as<rs2::video_stream_profile>();
                 if (!rc_receiveImage(rc.get(), sensor_id[p.unique_id()], p.format() == RS2_FORMAT_Y8 ? rc_FORMAT_GRAY8 : rc_FORMAT_DEPTH16,
-                                     to_rc_Timestamp(v), (rc_Timestamp)v.get_frame_metadata(RS2_FRAME_METADATA_ACTUAL_EXPOSURE),
+                                     to_rc_Timestamp_and_exposure(v).first, to_rc_Timestamp_and_exposure(v).second,
                                      v.get_height(), v.get_width(), v.get_stride_in_bytes(),
                                      v.get_data(),
                                      [](void *f){ delete (rs2::frame*)f; }, (void*)new rs2::frame(frame)))
