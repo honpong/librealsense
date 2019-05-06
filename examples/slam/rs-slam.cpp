@@ -287,7 +287,7 @@ int main(int argc, char * argv[]) try
                         const auto &p = s.as<rs2::video_stream_profile>();
                         if (!rc_receiveImage(rc.get(), sensor_id[p.unique_id()], p.format() == RS2_FORMAT_Y8 ? rc_FORMAT_GRAY8 : rc_FORMAT_DEPTH16,
                                              to_rc_Timestamp_and_exposure(v).first, to_rc_Timestamp_and_exposure(v).second,
-                                             v.get_height(), v.get_width(), v.get_stride_in_bytes(),
+                                             v.get_width(), v.get_height(), v.get_stride_in_bytes(),
                                              v.get_data(),
                                              [](void *f){ delete (rs2::frame*)f; }, (void*)new rs2::frame(frame)))
                             throw std::runtime_error(to_string() << "failed receive for frame " << frame);
@@ -302,7 +302,7 @@ int main(int argc, char * argv[]) try
                 const rs2::video_stream_profile &p = s.as<rs2::video_stream_profile>();
                 if (!rc_receiveImage(rc.get(), sensor_id[p.unique_id()], p.format() == RS2_FORMAT_Y8 ? rc_FORMAT_GRAY8 : rc_FORMAT_DEPTH16,
                                      to_rc_Timestamp_and_exposure(v).first, to_rc_Timestamp_and_exposure(v).second,
-                                     v.get_height(), v.get_width(), v.get_stride_in_bytes(),
+                                     v.get_width(), v.get_height(), v.get_stride_in_bytes(),
                                      v.get_data(),
                                      [](void *f){ delete (rs2::frame*)f; }, (void*)new rs2::frame(frame)))
                     throw std::runtime_error(to_string() << "failed receive for frame " << frame);
