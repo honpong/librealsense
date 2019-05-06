@@ -293,7 +293,7 @@ int main(int argc, char * argv[]) try
                                          v.get_width(), v.get_height(), v.get_stride_in_bytes(),
                                          v.get_data(),
                                          [](void *f){ delete (rs2::frame*)f; }, (void*)new rs2::frame(frame)))
-                        throw std::runtime_error(to_string() << "failed receive for frame " << frame.get_profile());
+                        throw std::runtime_error(to_string() << "failed receive for frame " << fp);
                 } else if (fp.stream_type() == RS2_STREAM_COLOR)
                     ; // skipping for now
                 else
@@ -309,17 +309,17 @@ int main(int argc, char * argv[]) try
                                      v.get_width(), v.get_height(), v.get_stride_in_bytes(),
                                      v.get_data(),
                                      [](void *f){ delete (rs2::frame*)f; }, (void*)new rs2::frame(frame)))
-                    throw std::runtime_error(to_string() << "failed receive for frame " << frame);
+                    throw std::runtime_error(to_string() << "failed receive for frame " << s);
             } else if (s.format() == RS2_FORMAT_MOTION_XYZ32F) {
                 const auto &m = frame.as<rs2::motion_frame>();
                 const auto &p = s.as<rs2::motion_stream_profile>();
                 const auto d = m.get_motion_data();
                 if (s.stream_type() == RS2_STREAM_GYRO) {
                     if (!rc_receiveGyro(rc.get(), sensor_id[p.unique_id()], to_rc_Timestamp(m), rc_Vector{{ d.x, d.y, d.z }}))
-                        throw std::runtime_error(to_string() << "failed receive for frame " << frame);
+                        throw std::runtime_error(to_string() << "failed receive for frame " << s);
                 } else if (s.stream_type() == RS2_STREAM_ACCEL) {
                     if (!rc_receiveAccelerometer(rc.get(), sensor_id[p.unique_id()], to_rc_Timestamp(m), rc_Vector{{ d.x, d.y, d.z }}))
-                        throw std::runtime_error(to_string() << "failed receive for frame " << frame);
+                        throw std::runtime_error(to_string() << "failed receive for frame " << s);
                 }
             }
         }
