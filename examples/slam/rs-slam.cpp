@@ -269,31 +269,35 @@ int main(int argc, char * argv[]) try
         try {
         if (frame.is<rs2::frameset>()) {
             auto fs = frame.as<rs2::frameset>();
-            if (fs.size() == 2 && fs[0].get_profile().format() == RS2_FORMAT_Y8 && fs[1].get_profile().format() == RS2_FORMAT_Y8) {
-                auto f0 = fs[0].as<rs2::video_frame>(); auto p0 = f0.get_profile().as<rs2::video_stream_profile>(); auto id0 = sensor_id[p0.unique_id()];
-                auto f1 = fs[1].as<rs2::video_frame>(); auto p1 = f0.get_profile().as<rs2::video_stream_profile>(); auto id1 = sensor_id[p1.unique_id()];
-                assert(id0/2 == id1/2);
-                if (!rc_receiveStereo(rc.get(), id0/2, rc_FORMAT_GRAY8,
-                                      to_rc_Timestamp_and_exposure(fs).first, to_rc_Timestamp_and_exposure(fs).second,
-                                      f0.get_width(), f0.get_height(), f0.get_stride_in_bytes(), f1.get_stride_in_bytes(),
-                                      f0.get_data(), f1.get_data(),
-                                      [](void *f){ delete (rs2::frameset*)f; }, (void*)new rs2::frameset(fs)))
-                    throw std::runtime_error(to_string() << "failed stereo receive for frame " << fs);
-            } else {
-                for (const rs2::frame &frame : frame.as<rs2::frameset>()) {
-                    auto s = frame.get_profile();
-                    if (s.format() == RS2_FORMAT_Y8 || s.format() == RS2_FORMAT_Z16) {
-                        const auto &v = frame.as<rs2::video_frame>();
-                        const auto &p = s.as<rs2::video_stream_profile>();
-                        if (!rc_receiveImage(rc.get(), sensor_id[p.unique_id()], p.format() == RS2_FORMAT_Y8 ? rc_FORMAT_GRAY8 : rc_FORMAT_DEPTH16,
-                                             to_rc_Timestamp_and_exposure(v).first, to_rc_Timestamp_and_exposure(v).second,
-                                             v.get_width(), v.get_height(), v.get_stride_in_bytes(),
-                                             v.get_data(),
-                                             [](void *f){ delete (rs2::frame*)f; }, (void*)new rs2::frame(frame)))
-                            throw std::runtime_error(to_string() << "failed receive for frame " << frame);
-                    } else
-                        throw  std::runtime_error(to_string() << "unexpected frameset " << frame);
-                }
+            for (auto fi = fs.begin(), ni=fi; fi != fs.end(); ++fi) {
+                rs2::frame f = (*fi);
+                rs2::frame n; if (++(ni=fi) != fs.end()) n = *ni;
+                rs2::stream_profile fp = f.get_profile();
+                rs2::stream_profile np; if (n) np = n.get_profile();
+                if (fp.format() == RS2_FORMAT_Y8 && np && np.format() == RS2_FORMAT_Y8) {
+                    auto f0 = f.as<rs2::video_frame>(); auto p0 = fp.as<rs2::video_stream_profile>(); auto id0 = sensor_id[p0.unique_id()];
+                    auto f1 = n.as<rs2::video_frame>(); auto p1 = np.as<rs2::video_stream_profile>(); auto id1 = sensor_id[p1.unique_id()];
+                    assert(id0/2 == id1/2 && f0.get_timestamp() == f1.get_timestamp() && f0.get_width() == f1.get_width() && f0.get_height() == f1.get_height());
+                    if (!rc_receiveStereo(rc.get(), id0/2, rc_FORMAT_GRAY8,
+                                          to_rc_Timestamp_and_exposure(fs).first, to_rc_Timestamp_and_exposure(fs).second,
+                                          f0.get_width(), f0.get_height(), f0.get_stride_in_bytes(), f1.get_stride_in_bytes(),
+                                          f0.get_data(), f1.get_data(),
+                                          [](void *f){ delete (rs2::frameset*)f; }, (void*)new rs2::frameset(fs)))
+                        throw std::runtime_error(to_string() << "failed stereo receive for frame " << fs.get_profile());
+                    fi = ni;
+                } else if (fp.format() == RS2_FORMAT_Y8 || fp.format() == RS2_FORMAT_Z16) {
+                    const auto &v = f.as<rs2::video_frame>();
+                    const auto &p = fp.as<rs2::video_stream_profile>();
+                    if (!rc_receiveImage(rc.get(), sensor_id[p.unique_id()], p.format() == RS2_FORMAT_Y8 ? rc_FORMAT_GRAY8 : rc_FORMAT_DEPTH16,
+                                         to_rc_Timestamp_and_exposure(v).first, to_rc_Timestamp_and_exposure(v).second,
+                                         v.get_width(), v.get_height(), v.get_stride_in_bytes(),
+                                         v.get_data(),
+                                         [](void *f){ delete (rs2::frame*)f; }, (void*)new rs2::frame(frame)))
+                        throw std::runtime_error(to_string() << "failed receive for frame " << frame.get_profile());
+                } else if (fp.stream_type() == RS2_STREAM_COLOR)
+                    ; // skipping for now
+                else
+                    throw std::runtime_error(to_string() << "unexpected frameset " << fp);
             }
         } else {
             auto s = frame.get_profile();
