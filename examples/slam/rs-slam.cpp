@@ -84,13 +84,13 @@ static rc_Timestamp to_rc_Timestamp(const rs2::frame &f) {
     return rc_Timestamp(1000*f.get_timestamp());
 }
 
-static std::pair<rc_Timestamp,rc_Timestamp> to_rc_Timestamp_and_exposure(const rs2::frame &f) {
+static std::pair<rc_Timestamp, rc_Timestamp> to_rc_Timestamp_and_exposure(const rs2::frame& f) {
+    auto p=std::make_pair(1000.0 * f.get_timestamp(), 0);
     if (f.supports_frame_metadata(RS2_FRAME_METADATA_ACTUAL_EXPOSURE))
-        return std::make_pair(1000*f.get_timestamp(), f.get_frame_metadata(RS2_FRAME_METADATA_ACTUAL_EXPOSURE));
+        p.second = f.get_frame_metadata(RS2_FRAME_METADATA_ACTUAL_EXPOSURE);
     else if (f.supports_frame_metadata(RS2_FRAME_METADATA_SENSOR_TIMESTAMP))
-        return std::make_pair(f.get_frame_metadata(RS2_FRAME_METADATA_SENSOR_TIMESTAMP), 0);
-    else
-        throw std::runtime_error(to_string() << "unable to determine exposure time of " << f);
+        p.first = f.get_frame_metadata(RS2_FRAME_METADATA_SENSOR_TIMESTAMP);
+    return p;
 }
 
 int main(int argc, char * argv[]) try
