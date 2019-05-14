@@ -10,6 +10,7 @@
 #include <memory>
 #include <fstream>
 #include <unordered_map>
+#include <string>
 #include "rc_tracker.h"
 
 struct to_string {
@@ -93,8 +94,23 @@ static std::pair<rc_Timestamp, rc_Timestamp> to_rc_Timestamp_and_exposure(const 
     return p;
 }
 
-int main(int argc, char * argv[]) try
+int main(int c, char * v[]) try
 {
+    if (0) { usage: std::cerr << "Usage: " << v[0] << " [--serial <number>] [--track] [<file.rc>]\n"; return 1; }
+
+    const char *filename = nullptr, *serial = nullptr;
+    bool track = false;
+
+    for (int i=1; i<c; i++)
+        if      (v[i][0] != '-' && !filename) filename = v[i];
+        else if (std::strcmp(v[i], "--serial") == 0 && i+1 < c) serial = v[i];
+        else if (std::strcmp(v[i], "--record") == 0 && i+1 < c) filename = v[i];
+        else if (std::strcmp(v[i], "--track") == 0) track = true;
+        else goto usage;
+
+    if (!filename || track)
+        goto usage;
+
     rs2::context ctx;
     rs2::pipeline pipe(ctx);
     rs2::config cfg;
@@ -103,8 +119,13 @@ int main(int argc, char * argv[]) try
         //for (const rs2::sensor &s : dev.query_sensors())
         std::cout << dev.get_info(RS2_CAMERA_INFO_NAME) << "\n";
 
-
+    if (serial)
+        cfg.enable_device(serial);
     //cfg.enable_all_streams();
+    cfg.disable_stream(RS2_STREAM_COLOR);
+    cfg.disable_stream(RS2_STREAM_DEPTH);
+    //cfg.enable_stream(RS2_STREAM_INFRARED, 1, RS2_FORMAT_Y8);
+    //cfg.enable_stream(RS2_STREAM_INFRARED, 2, RS2_FORMAT_Y8);
     cfg.enable_stream(RS2_STREAM_FISHEYE, 1, RS2_FORMAT_Y8);
     cfg.enable_stream(RS2_STREAM_FISHEYE, 2, RS2_FORMAT_Y8);
     cfg.enable_stream(RS2_STREAM_GYRO);
@@ -256,14 +277,14 @@ int main(int argc, char * argv[]) try
     }, (void *)&fast_slow);
 
     // either or both of these
-    rc_startCapture(rc.get(), rc_RUN_ASYNCHRONOUS, [](void *handle, const void *buffer, size_t length) {
+    if (filename) rc_startCapture(rc.get(), rc_RUN_ASYNCHRONOUS, [](void *handle, const void *buffer, size_t length) {
         if (buffer)
             static_cast<std::ofstream*>(handle)->write((const char *)buffer, length);
         else
             delete (std::ofstream*)handle;
-    }, (void*)new std::ofstream("/tmp/t.rc", std::ios::binary));
+    }, (void*)new std::ofstream(filename, std::ios::binary));
     //rc_setOutputLog(rc.get(), "/tmp/t.rc", rc_RUN_ASYNCHRONOUS);
-    //rc_startTracker(rc.get(), rc_RUN_ASYNCHRONOUS);
+    if (track) rc_startTracker(rc.get(), rc_RUN_ASYNCHRONOUS | rc_RUN_FAST_PATH | rc_RUN_RELOCALIZATION | rc_RUN_POSE_JUMP);
 
     pipe.start(cfg, [&rc,&sensor_id](const rs2::frame& frame) {
         try {
