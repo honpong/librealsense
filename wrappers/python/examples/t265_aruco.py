@@ -90,8 +90,75 @@ cfg = rs.config()
 # Start streaming with our callback
 pipe.start(cfg, callback)
 
+board_width = 16
+board_height = 10
+checker_size_m = 0.015
+april_size_m = 0.0075
 dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_1000)
-board = cv2.aruco.CharucoBoard_create(16,10,.015,.0075,dictionary)
+board = cv2.aruco.CharucoBoard_create(board_width, board_height, checker_size_m, april_size_m, dictionary)
+parameters = cv2.aruco.DetectorParameters_create()
+#parameters.adaptiveThreshWinSizeStep = 2
+#parameters.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_SUBPIX
+
+def detect_markers(frame):
+    (markers, ids, rejected) = cv2.aruco.detectMarkers(frame, dictionary, parameters=parameters)
+    (markers, ids, rejected, _) = cv2.aruco.refineDetectedMarkers(frame, board, markers, ids, rejected, errorCorrectionRate=1, parameters=parameters)
+    ok = ids is not None and len(ids) > 10
+    if ok:
+        (num_refined, chess_corners, chess_ids) = cv2.aruco.interpolateCornersCharuco(markers, ids, frame, board, minMarkers=1)
+        ok = num_refined > 10
+
+    if not ok:
+        return (False, None, None, None)
+
+    image_size = (frame.shape[1], frame.shape[0])
+
+    object_points = []
+    for cid in chess_ids:
+        object_points.append(board.chessboardCorners[cid[0],:])
+    object_points = np.array([object_points])
+    image_points = np.reshape(np.array(chess_corners), (1, -1, 2))
+    return (True, object_points, image_points, chess_ids)
+
+    """
+        K_guess = np.array([[285,   0, (image_size[0]-1)/2],
+                            [  0, 285, (image_size[1]-1)/2],
+                            [  0,   0, 1]])
+        D_guess = np.zeros((4,1))
+        D_guess = np.array([-0.000624021, 0.0357663, -0.0336763, 0.00530492])
+        print(object_points.shape)
+        print(object_points.dtype)
+        object_points = np.reshape(object_points, (1, 1, -1, 3))
+        image_points = np.reshape(image_points, (1, 1, -1, 2))
+        flags = cv2.fisheye.CALIB_FIX_SKEW | cv2.fisheye.CALIB_USE_INTRINSIC_GUESS
+
+        (rms_error, camera_matrix, distortion_coeffs, rvec, tvec) = cv2.fisheye.calibrate(objectPoints = object_points,
+                                                                                        imagePoints = image_points,
+                                                                                        image_size = image_size,
+                                                                                        K = K_guess,
+                                                                                        D = D_guess,
+                                                                                        flags = flags)
+    """
+
+observations = {"left" : []}
+def add_observation(camera_name, object_points, image_points, ids):
+    id_to_image_pt = {}
+    print(ids.shape)
+    for i in range(len(ids)):
+        id_to_image_pt[ids[i,0]] = image_points[0,i,:]
+
+    observations[camera_name].append((id_to_image_pt, object_points, image_points, ids))
+    print("Total observations for %s: %d" % (camera_name, len(observations[camera_name]))) 
+
+def min_dist_for_id(camera_name, feature_id, image_point):
+    # TODO: write this function
+    min_dist = 1000
+    for (id_to_image_pt, object_points, image_points, ids) in observations[camera_name]:
+        if feature_id not in id_to_image_pt: continue
+        dist = np.linalg.norm(id_to_image_pt[feature_id] - image_point)
+        if dist < min_dist:
+            min_dist = dist
+    return min_dist
 
 try:
     # Retreive the stream and intrinsic properties for both cameras
@@ -100,6 +167,8 @@ try:
                "right" : profiles.get_stream(rs.stream.fisheye, 2).as_video_stream_profile()}
     intrinsics = {"left"  : streams["left"].get_intrinsics(),
                   "right" : streams["right"].get_intrinsics()}
+    calibration_folder = "tmp"
+    measured = 0
 
     # Set up an OpenCV window to visualize the results
     WINDOW_TITLE = 'Realsense'
@@ -121,11 +190,6 @@ try:
 
     mode = "stack"
 
-    parameters =  cv2.aruco.DetectorParameters_create()
-
-    #parameters.adaptiveThreshWinSizeStep = 2
-    #parameters.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_SUBPIX
-
     while True:
         # Check if the camera has acquired any frames
         frame_mutex.acquire()
@@ -140,57 +204,26 @@ try:
                           "right" : frame_data["right"].copy()}
             frame_mutex.release()
 
-            imsize = frame_copy["left"].shape
+            (ok, object_points, image_points, chess_ids) = detect_markers(frame_copy["left"])
+            if ok:
+                for i in range(len(chess_ids)):
+                    print(len(chess_ids),image_points.shape)
+                    if min_dist_for_id("left", chess_ids[i,0], image_points[0,i,:]) > 100:
+                        add_observation("left", object_points, image_points, chess_ids)
+                        print("good left image")
+                        break
+            """
+            (ok, object_points, image_points, chess_ids) = detect_markers(frame_copy["right"])
+            if ok:
+                for i in range(len(chess_ids)):
+                    print(len(chess_ids),image_points.shape)
+                    if min_dist_for_id(chess_ids[i], image_points[0,i,:]) > 10:
+                        print("good right image")
+                        break
+            """
 
-            res = cv2.aruco.detectMarkers(frame_copy["left"],dictionary, parameters=parameters)
-            #print(res)
             color_image0 = cv2.cvtColor(frame_copy["left"], cv2.COLOR_GRAY2RGB)
-            if mode == "ids":
-                cv2.aruco.drawDetectedMarkers(color_image0,res[0],res[1])
-
-            res3 = cv2.aruco.refineDetectedMarkers(frame_copy["left"], board, res[0], res[1], res[2], errorCorrectionRate=1, parameters=parameters)
-
-            if mode == "r":
-                cv2.aruco.drawDetectedMarkers(color_image0,res3[0],res3[1])
-
-            if len(res3[0])>0:
-                res2 = cv2.aruco.interpolateCornersCharuco(res3[0],res3[1],frame_copy["left"],board, minMarkers=1)
-                if res2[1] is not None and res2[2] is not None:
-                    #print(res2)
-                    allCorners = []
-                    allIds = []
-                    allCorners.append(res2[1])
-                    allIds.append(res2[2])
-
-                    if mode == "p":
-                        cv2.aruco.drawDetectedCornersCharuco(color_image0, res2[1], res2[2])
-                    #cv2.drawChessboardCorners(color_image0, (36,25), res2[1], len(res2[1]))
-
-                    if False and len(res2[1]) > 3:
-                        cameraMatrixInit = K_left
-
-                        distCoeffsInit = np.zeros((5,1))
-                        flags = (cv2.CALIB_RATIONAL_MODEL)
-                        (ret, camera_matrix, distortion_coefficients0,
-                        rotation_vectors, translation_vectors,
-                        stdDeviationsIntrinsics, stdDeviationsExtrinsics,
-                        perViewErrors) = cv2.aruco.calibrateCameraCharucoExtended(
-                                        charucoCorners=allCorners,
-                                        charucoIds=allIds,
-                                        board=board,
-                                        imageSize=imsize,
-                                        cameraMatrix=cameraMatrixInit,
-                                        distCoeffs=distCoeffsInit,
-                                        flags=flags,
-                                        criteria=(cv2.TERM_CRITERIA_EPS & cv2.TERM_CRITERIA_COUNT, 10000, 1e-9))
-                        print(distortion_coefficients0, end="\r", flush=True)
-                        res = cv2.aruco.detectMarkers(frame_copy["left"],dictionary,cameraMatrix = camera_matrix, distCoeff = distortion_coefficients0)
-                        res2 = cv2.aruco.interpolateCornersCharuco(res[0],res[1],frame_copy["left"], board, cameraMatrix = camera_matrix, distCoeffs = distortion_coefficients0)
-                        cv2.aruco.drawDetectedCornersCharuco(color_image0, res2[1], res2[2], cornerColor=(0,255,0))
-
-            color_image1 = cv2.cvtColor(frame_copy["right"], cv2.COLOR_GRAY2RGB)
             cv2.imshow(WINDOW_TITLE,color_image0)
-            #cv2.imshow(WINDOW_TITLE, np.hstack((color_image0, color_image1)))
 
         key = cv2.waitKey(1)
         if key == ord('i'): mode = "ids"
