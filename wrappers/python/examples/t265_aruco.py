@@ -103,10 +103,10 @@ parameters = cv2.aruco.DetectorParameters_create()
 def detect_markers(frame):
     (markers, ids, rejected) = cv2.aruco.detectMarkers(frame, dictionary, parameters=parameters)
     (markers, ids, rejected, _) = cv2.aruco.refineDetectedMarkers(frame, board, markers, ids, rejected, errorCorrectionRate=1, parameters=parameters)
-    ok = ids is not None and len(ids) > 10
+    ok = ids is not None and len(ids) > 15
     if ok:
         (num_refined, chess_corners, chess_ids) = cv2.aruco.interpolateCornersCharuco(markers, ids, frame, board, minMarkers=1)
-        ok = num_refined > 10
+        ok = num_refined > 15
 
     if not ok:
         return (False, None, None, None)
@@ -140,10 +140,10 @@ def detect_markers(frame):
                                                                                         flags = flags)
     """
 
-observations = {"left" : []}
+observations = {"left" : [], "right" : []}
+
 def add_observation(camera_name, object_points, image_points, ids):
     id_to_image_pt = {}
-    print(ids.shape)
     for i in range(len(ids)):
         id_to_image_pt[ids[i,0]] = image_points[0,i,:]
 
@@ -151,7 +151,6 @@ def add_observation(camera_name, object_points, image_points, ids):
     print("Total observations for %s: %d" % (camera_name, len(observations[camera_name]))) 
 
 def min_dist_for_id(camera_name, feature_id, image_point):
-    # TODO: write this function
     min_dist = 1000
     for (id_to_image_pt, object_points, image_points, ids) in observations[camera_name]:
         if feature_id not in id_to_image_pt: continue
@@ -160,6 +159,35 @@ def min_dist_for_id(camera_name, feature_id, image_point):
             min_dist = dist
     return min_dist
 
+def calibrate_observations(camera_name):
+    obs = observations[camera_name]
+    object_points = []
+    image_points = []
+    for (id_to_image_pt, obj_i, img_i, ids) in obs:
+        print(obj_i.shape)
+        object_points.append(obj_i)
+        image_points.append(img_i)
+    #op = np.concatenate(object_points, axis=1)
+    #ip = np.concatenate(image_points, axis=1)
+    #print("P{", op.shape)
+    #print(ip.shape)
+    #object_points = np.reshape(op, (1, 1, -1, 3))
+    #image_points = np.reshape(ip, (1, 1, -1, 2))
+    flags = cv2.fisheye.CALIB_FIX_SKEW
+    image_size = (848, 800)
+
+    (rms_error, camera_matrix, distortion_coeffs, rvec, tvec) = cv2.fisheye.calibrate(objectPoints = object_points,
+                                                                                    imagePoints = image_points,
+                                                                                    image_size = image_size,
+                                                                                    K = None,
+                                                                                    D = None,
+                                                                                    flags = flags)
+    print("rms", rms_error)
+    print("camer", camera_matrix)
+    print("distortion_coeffs", distortion_coeffs)
+    print("rvec", rvec)
+    print("tvec", tvec)
+    
 try:
     # Retreive the stream and intrinsic properties for both cameras
     profiles = pipe.get_active_profile()
@@ -206,12 +234,16 @@ try:
 
             (ok, object_points, image_points, chess_ids) = detect_markers(frame_copy["left"])
             if ok:
+                good = True
                 for i in range(len(chess_ids)):
-                    print(len(chess_ids),image_points.shape)
-                    if min_dist_for_id("left", chess_ids[i,0], image_points[0,i,:]) > 100:
-                        add_observation("left", object_points, image_points, chess_ids)
-                        print("good left image")
+                    if min_dist_for_id("left", chess_ids[i,0], image_points[0,i,:]) < 10:
+                        good = False
                         break
+                if good:
+                    add_observation("left", object_points, image_points, chess_ids)
+                    print("good left image")
+                    if len(observations["left"]) > 10:
+                        calibrate_observations("left")
             """
             (ok, object_points, image_points, chess_ids) = detect_markers(frame_copy["right"])
             if ok:
