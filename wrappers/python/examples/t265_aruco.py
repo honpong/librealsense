@@ -181,7 +181,8 @@ def calibrate_observations(camera_name):
                                                                                     image_size = image_size,
                                                                                     K = None,
                                                                                     D = None,
-                                                                                    flags = flags)
+                                                                                    flags = flags,
+                                                                                    criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 500, 0.5))
     print("rms", rms_error)
     print("camer", camera_matrix)
     print("distortion_coeffs", distortion_coeffs)
