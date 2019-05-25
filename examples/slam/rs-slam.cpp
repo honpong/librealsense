@@ -96,19 +96,22 @@ static std::pair<rc_Timestamp, rc_Timestamp> to_rc_Timestamp_and_exposure(const 
 
 int main(int c, char * v[]) try
 {
-    if (0) { usage: std::cerr << "Usage: " << v[0] << " [--serial <number>] [--track] [<file.rc>]\n"; return 1; }
+    if (0) { usage: std::cerr << "Usage: " << v[0] << " [--serial <number>] [--record-time <seconds>] [--track] [<file.rc>]\n"; return 1; }
 
-    const char *filename = nullptr, *serial = nullptr;
-    bool track = false;
+    const char *recording_file = nullptr, *serial = nullptr, *calibration_json = nullptr, *playback_file = nullptr;
+    bool track = false; double record_time_s = 0;
 
     for (int i=1; i<c; i++)
-        if      (v[i][0] != '-' && !filename) filename = v[i];
-        else if (std::strcmp(v[i], "--serial") == 0 && i+1 < c) serial = v[i];
-        else if (std::strcmp(v[i], "--record") == 0 && i+1 < c) filename = v[i];
-        else if (std::strcmp(v[i], "--track") == 0) track = true;
+        if      (v[i][0] != '-' && !recording_file) recording_file = v[i];
+        else if (strcmp(v[i], "--serial") == 0 && i+1 < c) serial = v[++i];
+        else if (strcmp(v[i], "--save-json") == 0 && i+1 < c) calibration_json = v[++i];
+        else if (strcmp(v[i], "--record") == 0 && i+1 < c) recording_file = v[++i];
+        else if (strcmp(v[i], "--play") == 0 && i+1 < c) playback_file = v[++i];
+        else if (strcmp(v[i], "--record-time") == 0 && i+1 < c) record_time_s = std::stod(v[++i]);
+        else if (strcmp(v[i], "--track") == 0) track = true;
         else goto usage;
 
-    if (!filename || track)
+    if (!recording_file || !track)
         goto usage;
 
     rs2::context ctx;
@@ -119,7 +122,9 @@ int main(int c, char * v[]) try
         //for (const rs2::sensor &s : dev.query_sensors())
         std::cout << dev.get_info(RS2_CAMERA_INFO_NAME) << "\n";
 
-    if (serial)
+    if (playback_file)
+        cfg.enable_device_from_file(playback_file);
+    else if (serial)
         cfg.enable_device(serial);
     //cfg.enable_all_streams();
     cfg.disable_stream(RS2_STREAM_COLOR);
@@ -210,10 +215,10 @@ int main(int c, char * v[]) try
                                       " found "<< cameras << " camera(s), " << gyros << " gyroscope(s), " << accels << " accelerometer(s).");
     }
 
-    {
+    if (calibration_json) {
         const char *json = nullptr;
         if (size_t json_size = rc_getCalibration(rc.get(), &json))
-            std::cout << json << "\n";
+            std::ofstream(calibration_json) << json << "\n";
     }
 
     rc_configureQueueStrategy(rc.get(), rc_QUEUE_MINIMIZE_LATENCY);
@@ -277,12 +282,12 @@ int main(int c, char * v[]) try
     }, (void *)&fast_slow);
 
     // either or both of these
-    if (filename) rc_startCapture(rc.get(), rc_RUN_ASYNCHRONOUS, [](void *handle, const void *buffer, size_t length) {
+    if (recording_file) rc_startCapture(rc.get(), rc_RUN_ASYNCHRONOUS, [](void *handle, const void *buffer, size_t length) {
         if (buffer)
             static_cast<std::ofstream*>(handle)->write((const char *)buffer, length);
         else
             delete (std::ofstream*)handle;
-    }, (void*)new std::ofstream(filename, std::ios::binary));
+    }, (void*)new std::ofstream(recording_file, std::ios::binary));
     //rc_setOutputLog(rc.get(), "/tmp/t.rc", rc_RUN_ASYNCHRONOUS);
     if (track) rc_startTracker(rc.get(), rc_RUN_ASYNCHRONOUS | rc_RUN_FAST_PATH | rc_RUN_RELOCALIZATION | rc_RUN_POSE_JUMP);
 
@@ -351,8 +356,10 @@ int main(int c, char * v[]) try
         }
     });
 
-    for(int s=0; s<3; s++)
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    if (record_time_s)
+        std::this_thread::sleep_for(std::chrono::milliseconds(uint64_t(1000*record_time_s)));
+    else if (isatty(STDIN_FILENO))
+        { std::cerr << "press return to finish recording:"; std::getchar(); }
 
     pipe.stop();
     rc_stopTracker(rc.get());
