@@ -1,11 +1,13 @@
 // License: Apache 2.0. See LICENSE file in root directory.
 // Copyright(c) 2019 Intel Corporation. All Rights Reserved.
 #include <librealsense2/rs.hpp>
+#include <librealsense2/hpp/rs_sensor.hpp>
 #include <librealsense2/rsutil.h>
 #include <array>
 #include <cmath>
 #include <iostream>
 #include <vector>
+#include <fstream>
 #include "example.hpp"
 
 struct point3d {
@@ -31,7 +33,7 @@ struct pixel {
 typedef std::array<point3d, 4> object;
 
 static rs2_pose identity_pose();
-static rs2_pose reset_object_pose(const rs2_pose& device_pose_in_world = identity_pose());
+static rs2_pose set_object_pose(rs2::pose_sensor &tm2_sensor, const char *object_id, const rs2_pose& device_pose_in_world = identity_pose());
 static rs2_pose pose_inverse(const rs2_pose& p);
 static rs2_pose pose_multiply(const rs2_pose& ref2_in_ref1, const rs2_pose& ref3_in_ref2);
 static rs2_quaternion quaternion_conjugate(const rs2_quaternion& q);
@@ -41,27 +43,87 @@ static rs2_vector pose_transform_point(const rs2_pose& pose, const rs2_vector& p
 static rs2_vector vector_addition(const rs2_vector& a, const rs2_vector& b);
 static rs2_vector vector_negate(const rs2_vector& v);
 
-static object convert_object_coordinates(const object& obj, const rs2_pose& object_pose);
-
 static std::vector<point3d> raster_line(const point3d& a, const point3d& b, float step);
-static void render_line(const std::vector<pixel>& line, int color_code);
+static void render_line(const std::vector<pixel>& line, size_t color_code);
 static void render_text(int win_height, const std::string& text);
+static void bin_file_from_bytes(const std::string& filename, const std::vector<uint8_t> bytes);
+static std::vector<uint8_t> bytes_from_bin_file(const std::string& filename);
+
+class sensor_reprojection {
+public:
+    sensor_reprojection(const rs2_extrinsics &extrinsics) : _extrinsics(extrinsics) {}
+
+    void set_device_pose(const rs2_pose &device_pose_in_world) { _world_pose_in_device = pose_inverse(device_pose_in_world); }
+
+    std::vector<object> get_objects_in_sensor(const std::map<std::string, rs2_pose> &objects_in_world)
+    {
+        std::vector<object> objects_in_sensor;
+        for (auto &each_object : objects_in_world) {
+            rs2_pose object_pose_in_device = pose_multiply(_world_pose_in_device, each_object.second);
+
+            // Get the object vertices in device coordinates
+            object object_in_device = convert_object_coordinates(_virtual_object, object_pose_in_device);
+
+            object object_in_sensor;
+            // Convert object vertices from device coordinates into fisheye sensor coordinates using extrinsics
+            for (size_t i = 0; i < object_in_device.size(); ++i)
+            {
+                rs2_transform_point_to_point(object_in_sensor[i].f, &_extrinsics, object_in_device[i].f);
+            }
+            objects_in_sensor.emplace_back(object_in_sensor);
+        }
+        return objects_in_sensor;
+    }
+
+private:
+    rs2_pose _world_pose_in_device;
+    rs2_extrinsics _extrinsics;
+    // Create the vertices of a simple virtual object.
+    // This virtual object is 4 points in 3D space that describe 3 XYZ 20cm long axes.
+    // These vertices are relative to the object's own coordinate system.
+    const float _length = 0.20f;
+    const object _virtual_object = { {
+        { 0, 0, 0 },      // origin
+        { _length, 0, 0 }, // X
+        { 0, _length, 0 }, // Y
+        { 0, 0, _length }  // Z
+    } };
+
+    object convert_object_coordinates(const object& obj, const rs2_pose& object_pose)
+    {
+        object transformed_obj;
+        for (size_t i = 0; i < obj.size(); ++i) {
+            rs2_vector v{ obj[i].x(), obj[i].y(), obj[i].z() };
+            v = pose_transform_point(object_pose, v);
+            transformed_obj[i].f[0] = v.x;
+            transformed_obj[i].f[1] = v.y;
+            transformed_obj[i].f[2] = v.z;
+        }
+        return transformed_obj;
+    }
+};
 
 int main(int argc, char * argv[]) try
 {
-    std::cout << "Waiting for device..." << std::endl;
+    std::cout << "Waiting for T265 device..." << std::endl;
 
-    // Declare RealSense pipeline, encapsulating the actual device and sensors
-    rs2::pipeline pipe;
     // Create a configuration for configuring the pipeline with a non default profile
     rs2::config cfg;
     // Enable fisheye and pose streams
     cfg.enable_stream(RS2_STREAM_POSE, RS2_FORMAT_6DOF);
     cfg.enable_stream(RS2_STREAM_FISHEYE, 1);
     cfg.enable_stream(RS2_STREAM_FISHEYE, 2);
-    // Start pipeline with chosen configuration
-    rs2::pipeline_profile pipe_profile = pipe.start(cfg);
+    // Declare RealSense pipeline, encapsulating the actual device and sensors
+    rs2::pipeline pipe;
+    rs2::pipeline_profile pipe_profile = cfg.resolve(pipe);
+    // Initialize a shared pointer to a device with the current device on the pipeline
+    rs2::pose_sensor tm_sensor = pipe_profile.get_device().first<rs2::pose_sensor>();
+    const char *map_path = "map.bin";
+    const bool load_map = false, save_map = true;
+    if (tm_sensor && load_map) tm_sensor.import_localization_map(bytes_from_bin_file(map_path));
 
+    // Start pipeline with chosen configuration
+    pipe.start(cfg);
     // T265 has two fisheye sensors, we can choose any of them (index 1 or 2)
     const int fisheye_sensor_idx = 1;
 
@@ -71,7 +133,7 @@ int main(int argc, char * argv[]) try
 
     // Get fisheye sensor extrinsics parameters.
     // This is the pose of the fisheye sensor relative to the T265 coordinate system.
-    rs2_extrinsics extrinsics = fisheye_stream.get_extrinsics_to(pipe_profile.get_stream(RS2_STREAM_POSE));
+    sensor_reprojection projection_on_sensor(fisheye_stream.get_extrinsics_to(pipe_profile.get_stream(RS2_STREAM_POSE)));
 
     std::cout << "Device got. Streaming data" << std::endl;
 
@@ -80,21 +142,10 @@ int main(int argc, char * argv[]) try
     window_key_listener key_watcher(app);
     texture fisheye_image;
 
-    // Create the vertices of a simple virtual object.
-    // This virtual object is 4 points in 3D space that describe 3 XYZ 20cm long axes.
-    // These vertices are relative to the object's own coordinate system.
-    const float length = 0.20;
-    const object virtual_object = {{
-        { 0, 0, 0 },      // origin
-        { length, 0, 0 }, // X
-        { 0, length, 0 }, // Y
-        { 0, 0, length }  // Z
-    }};
-
     // This variable will hold the pose of the virtual object in world coordinates.
     // We we initialize it once we get the first pose frame.
-    rs2_pose object_pose_in_world;
-    bool object_pose_in_world_initialized = false;
+    std::map<std::string, rs2_pose> objects_in_world;
+    bool objects_in_world_initialized = false;
 
     // Main loop
     while (app)
@@ -111,6 +162,8 @@ int main(int argc, char * argv[]) try
             // Copy current camera pose
             device_pose_in_world = pose_frame.get_pose_data();
 
+            projection_on_sensor.set_device_pose(device_pose_in_world);
+
             // Render the fisheye image
             fisheye_image.render(fisheye_frame, { 0, 0, app.width(), app.height() });
 
@@ -118,44 +171,39 @@ int main(int argc, char * argv[]) try
         }
 
         // If we have not set the virtual object in the world yet, set it in front of the camera now.
-        if (!object_pose_in_world_initialized)
+        if (!objects_in_world_initialized)
         {
-            object_pose_in_world = reset_object_pose(device_pose_in_world);
-            object_pose_in_world_initialized = true;
+            //objects_in_world.emplace("0", set_object_pose(tm_sensor, "0", device_pose_in_world));
+            objects_in_world_initialized = true;
         }
 
         // Compute the pose of the object relative to the current pose of the device
-        rs2_pose world_pose_in_device = pose_inverse(device_pose_in_world);
-        rs2_pose object_pose_in_device = pose_multiply(world_pose_in_device, object_pose_in_world);
-
-        // Get the object vertices in device coordinates
-        object object_in_device = convert_object_coordinates(virtual_object, object_pose_in_device);
-
-        // Convert object vertices from device coordinates into fisheye sensor coordinates using extrinsics
-        object object_in_sensor;
-        for (size_t i = 0; i < object_in_device.size(); ++i)
+        for (auto &each_object : objects_in_world)
         {
-            rs2_transform_point_to_point(object_in_sensor[i].f, &extrinsics, object_in_device[i].f);
+            tm_sensor.get_static_node(each_object.first, each_object.second.translation, each_object.second.rotation);
         }
-
-        for (size_t i = 1; i < object_in_sensor.size(); ++i)
+        // Convert object vertices from device coordinates into fisheye sensor coordinates using extrinsics
+        for (auto &each_object : projection_on_sensor.get_objects_in_sensor(objects_in_world))
         {
-            // Discretize the virtual object line into smaller 1cm long segments
-            std::vector<point3d> points_in_sensor = raster_line(object_in_sensor[0], object_in_sensor[i], 0.01);
-            std::vector<pixel> projected_line;
-            projected_line.reserve(points_in_sensor.size());
-            for (auto& point : points_in_sensor)
+            for (size_t i = 1; i < each_object.size(); ++i)
             {
-                // A 3D point is visible in the image if its Z coordinate relative to the fisheye sensor is positive.
-                if (point.z() > 0)
+                // Discretize the virtual object line into smaller 1cm long segments
+                std::vector<point3d> points_in_sensor = raster_line(each_object[0], each_object[i], 0.01f);
+                std::vector<pixel> projected_line;
+                projected_line.reserve(points_in_sensor.size());
+                for (auto& point : points_in_sensor)
                 {
-                    // Project 3D sensor coordinates to 2D fisheye image coordinates using intrinsics
-                    projected_line.emplace_back();
-                    rs2_project_point_to_pixel(projected_line.back().f, &intrinsics, point.f);
+                    // A 3D point is visible in the image if its Z coordinate relative to the fisheye sensor is positive.
+                    if (point.z() > 0)
+                    {
+                        // Project 3D sensor coordinates to 2D fisheye image coordinates using intrinsics
+                        projected_line.emplace_back();
+                        rs2_project_point_to_pixel(projected_line.back().f, &intrinsics, point.f);
+                    }
                 }
+                // Display the line in the image
+                render_line(projected_line, i);
             }
-            // Display the line in the image
-            render_line(projected_line, i);
         }
 
         // Display text in the image
@@ -165,9 +213,16 @@ int main(int argc, char * argv[]) try
         switch (key_watcher.get_key())
         {
         case GLFW_KEY_SPACE:
-            // Reset virtual object pose if user presses spacebar
-            object_pose_in_world = reset_object_pose(device_pose_in_world);
-            std::cout << "Setting new pose for virtual object: " << object_pose_in_world.translation << std::endl;
+            // Set virtual object pose if user presses spacebar
+            objects_in_world["1"] = set_object_pose(tm_sensor, "1", device_pose_in_world);
+            break;
+        case GLFW_KEY_S:
+            if (save_map)
+            {
+                pipe.stop();
+                bin_file_from_bytes(map_path, tm_sensor.export_localization_map());
+                std::cout << "Saving relocalization map to: " << map_path << std::endl;
+            }
             break;
         case GLFW_KEY_ESCAPE:
             // Exit if user presses escape
@@ -175,7 +230,6 @@ int main(int argc, char * argv[]) try
             break;
         }
     }
-
     return EXIT_SUCCESS;
 }
 catch (const rs2::error & e)
@@ -203,7 +257,7 @@ rs2_pose identity_pose()
     return pose;
 }
 
-rs2_pose reset_object_pose(const rs2_pose& device_pose_in_world)
+rs2_pose set_object_pose(rs2::pose_sensor &tm_sensor, const char *object_id, const rs2_pose& device_pose_in_world)
 {
     // Set the object 50 centimeter away in front of the camera.
     // T265 coordinate system is defined here: https://github.com/IntelRealSense/librealsense/blob/master/doc/t265.md#sensor-origin-and-coordinate-system
@@ -218,6 +272,8 @@ rs2_pose reset_object_pose(const rs2_pose& device_pose_in_world)
 
     // Convert the pose of the virtual object from camera coordinates into world coordinates
     rs2_pose object_pose_in_world = pose_multiply(device_pose_in_world, object_pose_in_device);
+    if (object_id && tm_sensor.set_static_node(object_id, object_pose_in_world.translation, object_pose_in_world.rotation))
+        std::cout << "Setting new pose " << object_pose_in_world.translation << " for virtual object: " << object_id << std::endl;
     return object_pose_in_world;
 }
 
@@ -274,19 +330,6 @@ rs2_vector vector_negate(const rs2_vector& v)
     return rs2_vector { -v.x, -v.y, -v.z };
 }
 
-object convert_object_coordinates(const object& obj, const rs2_pose& object_pose)
-{
-    object transformed_obj;
-    for (size_t i = 0; i < obj.size(); ++i) {
-        rs2_vector v { obj[i].x(), obj[i].y(), obj[i].z() };
-        v = pose_transform_point(object_pose, v);
-        transformed_obj[i].f[0] = v.x;
-        transformed_obj[i].f[1] = v.y;
-        transformed_obj[i].f[2] = v.z;
-    }
-    return transformed_obj;
-}
-
 std::vector<point3d> raster_line(const point3d& a, const point3d& b, float step)
 {
     rs2_vector direction = { b.x() - a.x(), b.y() - a.y(), b.z() - a.z() };
@@ -312,7 +355,7 @@ std::vector<point3d> raster_line(const point3d& a, const point3d& b, float step)
     return points;
 }
 
-void render_line(const std::vector<pixel>& line, int color_code)
+void render_line(const std::vector<pixel>& line, size_t color_code)
 {
     if (!line.empty())
     {
@@ -344,4 +387,34 @@ void render_text(int win_height, const std::string& text)
     draw_text(15, (win_height - 10) / 2, text.c_str());
     glScalef(1, 1, 1);
     glColor4fv(current_color);
+}
+
+void bin_file_from_bytes(const std::string& filename, const std::vector<uint8_t> bytes)
+{
+    std::ofstream file(filename, std::ios::binary | std::ios::trunc);
+    if (!file.good())
+        throw std::runtime_error("Invalid binary file specified. Verify the target path and location permissions");
+    file.write((char*)bytes.data(), bytes.size());
+}
+
+std::vector<uint8_t> bytes_from_bin_file(const std::string& filename)
+{
+    std::ifstream file(filename.c_str(), std::ios::binary);
+    if (!file.good())
+        throw std::runtime_error("Invalid binary file specified. Verify the source path and location permissions");
+
+    // Determine the file length
+    file.seekg(0, std::ios_base::end);
+    std::size_t size = file.tellg();
+    if (!size)
+        throw std::runtime_error("Invalid binary file -zero-size");
+    file.seekg(0, std::ios_base::beg);
+
+    // Create a vector to store the data
+    std::vector<uint8_t> v(size);
+
+    // Load the data
+    file.read((char*)&v[0], size);
+
+    return v;
 }
