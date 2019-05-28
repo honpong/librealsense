@@ -282,8 +282,8 @@ int main(int c, char * v[]) try
 
     int output_fps = pipeline_profile.get_stream(RS2_STREAM_GYRO).fps(); // we choose to output pose on the gyro, see rc_setDataCallback
     struct fast_slow { rc_software_pose fast, slow; } fast_slow = {
-        {"Slow Pose", dev, ref, output_fps / 2, rc_SENSOR_TYPE_GYROSCOPE, rc.get(), rc_DATA_PATH_SLOW},
         {"Fast Pose", dev, ref, output_fps,     rc_SENSOR_TYPE_GYROSCOPE, rc.get(), rc_DATA_PATH_FAST},
+        {"Slow Pose", dev, ref, output_fps / 2, rc_SENSOR_TYPE_GYROSCOPE, rc.get(), rc_DATA_PATH_SLOW},
     };
     rc_setDataCallback(rc.get(), [](void *handle, rc_Tracker *tracker, const rc_Data *data) {
         auto &fs = *(struct fast_slow*)handle;
