@@ -173,14 +173,16 @@ def calibrate_observations(camera_name):
     #print(ip.shape)
     #object_points = np.reshape(op, (1, 1, -1, 3))
     #image_points = np.reshape(ip, (1, 1, -1, 2))
-    flags = cv2.fisheye.CALIB_FIX_SKEW
+    flags = cv2.fisheye.CALIB_FIX_SKEW | cv2.fisheye.CALIB_FIX_K1 | cv2.fisheye.CALIB_FIX_K2 | cv2.fisheye.CALIB_FIX_K3 | cv2.fisheye.CALIB_FIX_K4
+    D = np.array([-0.00626438, 0.0493399, -0.0463255, 0.00896666])
+    K = np.zeros((3,3))
     image_size = (848, 800)
 
     (rms_error, camera_matrix, distortion_coeffs, rvec, tvec) = cv2.fisheye.calibrate(objectPoints = object_points,
                                                                                     imagePoints = image_points,
                                                                                     image_size = image_size,
                                                                                     K = None,
-                                                                                    D = None,
+                                                                                    D = D,
                                                                                     flags = flags,
                                                                                     criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 500, 0.5))
     print("rms", rms_error)
