@@ -33,7 +33,6 @@ struct pixel {
 typedef std::array<point3d, 4> object;
 
 static rs2_pose identity_pose();
-static rs2_pose set_object_pose(rs2::pose_sensor &tm2_sensor, const char *object_id, const rs2_pose& device_pose_in_world = identity_pose());
 static rs2_pose pose_inverse(const rs2_pose& p);
 static rs2_pose pose_multiply(const rs2_pose& ref2_in_ref1, const rs2_pose& ref3_in_ref2);
 static rs2_quaternion quaternion_conjugate(const rs2_quaternion& q);
@@ -45,39 +44,58 @@ static rs2_vector vector_negate(const rs2_vector& v);
 
 static std::vector<point3d> raster_line(const point3d& a, const point3d& b, float step);
 static void render_line(const std::vector<pixel>& line, size_t color_code);
-static void render_text(int win_height, const std::string& text);
+static void render_text(int x, int y, const std::string& text);
 static void bin_file_from_bytes(const std::string& filename, const std::vector<uint8_t> bytes);
 static std::vector<uint8_t> bytes_from_bin_file(const std::string& filename);
 
 class sensor_reprojection {
 public:
-    sensor_reprojection(const rs2_extrinsics &extrinsics) : _extrinsics(extrinsics) {}
+    sensor_reprojection(rs2::pose_sensor &tm_sensor, const rs2_extrinsics &extrinsics) : _tm_sensor(tm_sensor), _extrinsics(extrinsics) {
+        _object_pose_in_device.translation.x = 0;
+        _object_pose_in_device.translation.y = 0;
+        _object_pose_in_device.translation.z = -0.50; // 50 centimeter away in front of the camera.
+        _object_pose_in_device.rotation = { 0, 0, 0, 1 };
+    }
 
-    void set_device_pose(const rs2_pose &device_pose_in_world) { _world_pose_in_device = pose_inverse(device_pose_in_world); }
-
-    std::vector<object> get_objects_in_sensor(const std::map<std::string, rs2_pose> &objects_in_world)
+    std::vector<object> get_objects_in_sensor(const rs2_pose &device_pose_in_world, const std::map<std::string, rs2_pose> &objects_in_world)
     {
         std::vector<object> objects_in_sensor;
+        rs2_pose world_pose_in_device = pose_inverse(device_pose_in_world);
         for (auto &each_object : objects_in_world) {
-            rs2_pose object_pose_in_device = pose_multiply(_world_pose_in_device, each_object.second);
+            // Compute the pose of the object relative to the current pose of the device
+            rs2_pose w_object;
+            if (_tm_sensor.get_static_node(each_object.first, w_object.translation, w_object.rotation)) {
+                rs2_pose object_pose_in_device = pose_multiply(world_pose_in_device, w_object);
 
-            // Get the object vertices in device coordinates
-            object object_in_device = convert_object_coordinates(_virtual_object, object_pose_in_device);
+                // Get the object vertices in device coordinates
+                object object_in_device = convert_object_coordinates(_virtual_object, object_pose_in_device);
 
-            object object_in_sensor;
-            // Convert object vertices from device coordinates into fisheye sensor coordinates using extrinsics
-            for (size_t i = 0; i < object_in_device.size(); ++i)
-            {
-                rs2_transform_point_to_point(object_in_sensor[i].f, &_extrinsics, object_in_device[i].f);
+                object object_in_sensor;
+                // Convert object vertices from device coordinates into fisheye sensor coordinates using extrinsics
+                for (size_t i = 0; i < object_in_device.size(); ++i)
+                {
+                    rs2_transform_point_to_point(object_in_sensor[i].f, &_extrinsics, object_in_device[i].f);
+                }
+                objects_in_sensor.emplace_back(object_in_sensor);
             }
-            objects_in_sensor.emplace_back(object_in_sensor);
         }
         return objects_in_sensor;
     }
 
+    bool set_object_pose(rs2_pose &object_pose_in_world, const char *object_id, const rs2_pose& device_pose_in_world = identity_pose()) {
+        // Convert the pose of the virtual object from camera coordinates into world coordinates
+        rs2_pose _object_pose_in_world = pose_multiply(device_pose_in_world, _object_pose_in_device);
+        if (object_id && _tm_sensor.set_static_node(object_id, _object_pose_in_world.translation, _object_pose_in_world.rotation)) {
+            std::cout << "Setting new pose " << _object_pose_in_world.translation << " for virtual object: " << object_id << std::endl;
+            object_pose_in_world = _object_pose_in_world;
+            return true;
+        }
+        return false;
+    }
+
 private:
-    rs2_pose _world_pose_in_device;
     rs2_extrinsics _extrinsics;
+    rs2::pose_sensor _tm_sensor;
     // Create the vertices of a simple virtual object.
     // This virtual object is 4 points in 3D space that describe 3 XYZ 20cm long axes.
     // These vertices are relative to the object's own coordinate system.
@@ -88,6 +106,10 @@ private:
         { 0, _length, 0 }, // Y
         { 0, 0, _length }  // Z
     } };
+
+    // Oject 50 centimeter away in front of the camera.
+    // T265 coordinate system is defined here: https://github.com/IntelRealSense/librealsense/blob/master/doc/t265.md#sensor-origin-and-coordinate-system
+    rs2_pose _object_pose_in_device;
 
     object convert_object_coordinates(const object& obj, const rs2_pose& object_pose)
     {
@@ -133,7 +155,7 @@ int main(int argc, char * argv[]) try
 
     // Get fisheye sensor extrinsics parameters.
     // This is the pose of the fisheye sensor relative to the T265 coordinate system.
-    sensor_reprojection projection_on_sensor(fisheye_stream.get_extrinsics_to(pipe_profile.get_stream(RS2_STREAM_POSE)));
+    sensor_reprojection projection_on_sensor(tm_sensor, fisheye_stream.get_extrinsics_to(pipe_profile.get_stream(RS2_STREAM_POSE)));
 
     std::cout << "Device got. Streaming data" << std::endl;
 
@@ -145,7 +167,6 @@ int main(int argc, char * argv[]) try
     // This variable will hold the pose of the virtual object in world coordinates.
     // We we initialize it once we get the first pose frame.
     std::map<std::string, rs2_pose> objects_in_world;
-    bool objects_in_world_initialized = false;
 
     // Main loop
     while (app)
@@ -162,28 +183,14 @@ int main(int argc, char * argv[]) try
             // Copy current camera pose
             device_pose_in_world = pose_frame.get_pose_data();
 
-            projection_on_sensor.set_device_pose(device_pose_in_world);
-
             // Render the fisheye image
             fisheye_image.render(fisheye_frame, { 0, 0, app.width(), app.height() });
 
             // By closing the current scope we let frames be deallocated, so we do not fill up librealsense queues while we do other computation.
         }
 
-        // If we have not set the virtual object in the world yet, set it in front of the camera now.
-        if (!objects_in_world_initialized)
-        {
-            //objects_in_world.emplace("0", set_object_pose(tm_sensor, "0", device_pose_in_world));
-            objects_in_world_initialized = true;
-        }
-
-        // Compute the pose of the object relative to the current pose of the device
-        for (auto &each_object : objects_in_world)
-        {
-            tm_sensor.get_static_node(each_object.first, each_object.second.translation, each_object.second.rotation);
-        }
         // Convert object vertices from device coordinates into fisheye sensor coordinates using extrinsics
-        for (auto &each_object : projection_on_sensor.get_objects_in_sensor(objects_in_world))
+        for (auto &each_object : projection_on_sensor.get_objects_in_sensor(device_pose_in_world, objects_in_world))
         {
             for (size_t i = 1; i < each_object.size(); ++i)
             {
@@ -204,18 +211,26 @@ int main(int argc, char * argv[]) try
                 // Display the line in the image
                 render_line(projected_line, i);
             }
+            pixel origin;
+            rs2_project_point_to_pixel(origin.f, &intrinsics, each_object[0].f);
+            render_text(origin.x(), origin.y(), "T");
         }
 
         // Display text in the image
-        render_text(app.height(), "Press spacebar to reset the pose of the virtual object. Press ESC to exit");
+        render_text(15, (app.height() - 10) / 2, "Press spacebar to reset the pose of the virtual object. Press ESC to exit");
 
         // Check if some key is pressed
         switch (key_watcher.get_key())
         {
-        case GLFW_KEY_SPACE:
-            // Set virtual object pose if user presses spacebar
-            objects_in_world["1"] = set_object_pose(tm_sensor, "1", device_pose_in_world);
+        case GLFW_KEY_SPACE: {
+            // Set/Reset virtual object pose if user presses spacebar
+            rs2_pose object_pose_in_world;
+            char *node_name = "1";
+            if (objects_in_world.size() >= 1) node_name = "2";
+            if (projection_on_sensor.set_object_pose(object_pose_in_world, node_name, device_pose_in_world))
+                objects_in_world[node_name] = object_pose_in_world;
             break;
+        }
         case GLFW_KEY_S:
             if (save_map)
             {
@@ -255,26 +270,6 @@ rs2_pose identity_pose()
     pose.rotation.z = 0;
     pose.rotation.w = 1;
     return pose;
-}
-
-rs2_pose set_object_pose(rs2::pose_sensor &tm_sensor, const char *object_id, const rs2_pose& device_pose_in_world)
-{
-    // Set the object 50 centimeter away in front of the camera.
-    // T265 coordinate system is defined here: https://github.com/IntelRealSense/librealsense/blob/master/doc/t265.md#sensor-origin-and-coordinate-system
-    rs2_pose object_pose_in_device;
-    object_pose_in_device.translation.x = 0;
-    object_pose_in_device.translation.y = 0;
-    object_pose_in_device.translation.z = -0.50;
-    object_pose_in_device.rotation.x = 0;
-    object_pose_in_device.rotation.y = 0;
-    object_pose_in_device.rotation.z = 0;
-    object_pose_in_device.rotation.w = 1;
-
-    // Convert the pose of the virtual object from camera coordinates into world coordinates
-    rs2_pose object_pose_in_world = pose_multiply(device_pose_in_world, object_pose_in_device);
-    if (object_id && tm_sensor.set_static_node(object_id, object_pose_in_world.translation, object_pose_in_world.rotation))
-        std::cout << "Setting new pose " << object_pose_in_world.translation << " for virtual object: " << object_id << std::endl;
-    return object_pose_in_world;
 }
 
 rs2_pose pose_inverse(const rs2_pose& p)
@@ -378,13 +373,13 @@ void render_line(const std::vector<pixel>& line, size_t color_code)
     }
 }
 
-void render_text(int win_height, const std::string& text)
+void render_text(int x, int y, const std::string& text)
 {
     GLfloat current_color[4];
     glGetFloatv(GL_CURRENT_COLOR, current_color);
     glColor3f(0, 0.5, 1);
     glScalef(2, 2, 2);
-    draw_text(15, (win_height - 10) / 2, text.c_str());
+    draw_text(x, y, text.c_str());
     glScalef(1, 1, 1);
     glColor4fv(current_color);
 }
