@@ -11,6 +11,8 @@
 #include <fstream>
 #include <unordered_map>
 #include <string>
+#include <cstring>
+#include <unistd.h>
 #include "rc_tracker.h"
 
 struct to_string {
