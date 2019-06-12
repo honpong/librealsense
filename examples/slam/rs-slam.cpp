@@ -110,7 +110,7 @@ int main(int c, char * v[]) try
     if (0) { usage: std::cerr << "Usage: " << v[0] << " [--serial <number>] [--record-time <seconds>] [--track] [<file.rc>]\n"; return 1; }
 
     const char *recording_file = nullptr, *serial = nullptr, *calibration_json = nullptr, *playback_file = nullptr;
-    bool track = false; double record_time_s = 0;
+    bool stream = false, track = false; double record_time_s = 0;
 
     for (int i=1; i<c; i++)
         if      (v[i][0] != '-' && !recording_file) recording_file = v[i];
@@ -120,9 +120,10 @@ int main(int c, char * v[]) try
         else if (strcmp(v[i], "--play") == 0 && i+1 < c) playback_file = v[++i];
         else if (strcmp(v[i], "--record-time") == 0 && i+1 < c) record_time_s = std::stod(v[++i]);
         else if (strcmp(v[i], "--track") == 0) track = true;
+        else if (strcmp(v[i], "--stream") == 0) stream = true;
         else goto usage;
 
-    if (!recording_file || !track)
+    if (!recording_file && !track && !stream)
         goto usage;
 
     rs2::context ctx;
