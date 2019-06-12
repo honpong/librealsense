@@ -316,7 +316,7 @@ int main(int c, char * v[]) try
                     auto f0 = f.as<rs2::video_frame>(); auto p0 = fp.as<rs2::video_stream_profile>(); auto id0 = sensor_id[p0.unique_id()];
                     auto f1 = n.as<rs2::video_frame>(); auto p1 = np.as<rs2::video_stream_profile>(); auto id1 = sensor_id[p1.unique_id()];
                     assert(id0/2 == id1/2 && f0.get_timestamp() == f1.get_timestamp() && f0.get_width() == f1.get_width() && f0.get_height() == f1.get_height());
-                    if (is_emitter_on(f0) || is_emitter_on(f1)) std::cout << "skipping stereo pair with emitter on\n"; else
+                    if (is_emitter_on(f0) || is_emitter_on(f1)) std::cout << "    skipping stereo pair with emitter on\n"; else
                     if (!rc_receiveStereo(rc.get(), id0/2, rc_FORMAT_GRAY8,
                                           to_rc_Timestamp_and_exposure(fs).first, to_rc_Timestamp_and_exposure(fs).second,
                                           f0.get_width(), f0.get_height(), f0.get_stride_in_bytes(), f1.get_stride_in_bytes(),
@@ -327,7 +327,8 @@ int main(int c, char * v[]) try
                 } else if (fp.format() == RS2_FORMAT_Y8 || fp.format() == RS2_FORMAT_Z16) {
                     const auto &v = f.as<rs2::video_frame>();
                     const auto &p = fp.as<rs2::video_stream_profile>();
-                    if (is_emitter_on(v)) std::cout << "skipping " << v.get_profile().stream_name() << " with emitter on\n"; else
+                    bool on = is_emitter_on(v);
+                    if ((fp.format() == RS2_FORMAT_Y8 && on) || (fp.format() == RS2_FORMAT_Z16 && !on)) std::cout << "    skipping " << v.get_profile().stream_name() << " with emitter " << (on ? "on" : "off") << "\n"; else
                     if (!rc_receiveImage(rc.get(), sensor_id[p.unique_id()], p.format() == RS2_FORMAT_Y8 ? rc_FORMAT_GRAY8 : rc_FORMAT_DEPTH16,
                                          to_rc_Timestamp_and_exposure(v).first, to_rc_Timestamp_and_exposure(v).second,
                                          v.get_width(), v.get_height(), v.get_stride_in_bytes(),
@@ -344,7 +345,8 @@ int main(int c, char * v[]) try
             if (s.format() == RS2_FORMAT_Y8 || s.format() == RS2_FORMAT_Z16) {
                 const rs2::video_frame &v = frame.as<rs2::video_frame>();
                 const rs2::video_stream_profile &p = s.as<rs2::video_stream_profile>();
-                if (is_emitter_on(v)) std::cout << "skipping " << v.get_profile().stream_name() << " with emitter on\n"; else
+                bool on = is_emitter_on(v);
+                if ((s.format() == RS2_FORMAT_Y8 && on) || (s.format() == RS2_FORMAT_Z16 && !on)) std::cout << "skipping " << v.get_profile().stream_name() << " with emitter " << (on ? "on" : "off") << "\n"; else
                 if (!rc_receiveImage(rc.get(), sensor_id[p.unique_id()], p.format() == RS2_FORMAT_Y8 ? rc_FORMAT_GRAY8 : rc_FORMAT_DEPTH16,
                                      to_rc_Timestamp_and_exposure(v).first, to_rc_Timestamp_and_exposure(v).second,
                                      v.get_width(), v.get_height(), v.get_stride_in_bytes(),
