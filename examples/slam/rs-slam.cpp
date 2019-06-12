@@ -95,7 +95,8 @@ static std::pair<rc_Timestamp, rc_Timestamp> to_rc_Timestamp_and_exposure(const 
 }
 
 static bool is_emitter_on(const rs2::frame &f) {
-    if (f.get_profile().stream_type() == RS2_STREAM_INFRARED) {
+    auto stream = f.get_profile().stream_type();
+    if (stream == RS2_STREAM_INFRARED || stream == RS2_STREAM_DEPTH) {
         if (f.supports_frame_metadata(RS2_FRAME_METADATA_FRAME_LASER_POWER_MODE))
             return f.get_frame_metadata(RS2_FRAME_METADATA_FRAME_LASER_POWER_MODE); //Laser power mode. Zero corresponds to Laser power switched off and one for switched on.
         else
