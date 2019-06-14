@@ -186,10 +186,10 @@ def calibrate_observations(camera_name):
                                                                                     flags = flags,
                                                                                     criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 500, 0.5))
     print("rms", rms_error)
-    print("camer", camera_matrix)
+    print("camera", camera_matrix)
     print("distortion_coeffs", distortion_coeffs)
-    print("rvec", rvec)
-    print("tvec", tvec)
+    #print("rvec", rvec)
+    #print("tvec", tvec)
     
 try:
     # Retreive the stream and intrinsic properties for both cameras
