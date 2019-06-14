@@ -102,10 +102,31 @@ parameters = cv2.aruco.DetectorParameters_create()
 
 def detect_markers(frame):
     (markers, ids, rejected) = cv2.aruco.detectMarkers(frame, dictionary, parameters=parameters)
+
+    frame_copy = frame.copy()
+    cv2.aruco.drawDetectedMarkers(frame_copy, markers, ids)
+    cv2.imshow("detected markers", frame_copy)
+    cv2.waitKey(1)
+    cv2.imwrite("1_detect_markers.png", frame_copy)
+
     (markers, ids, rejected, _) = cv2.aruco.refineDetectedMarkers(frame, board, markers, ids, rejected, errorCorrectionRate=1, parameters=parameters)
+
+    frame_copy2 = frame.copy()
+    cv2.aruco.drawDetectedMarkers(frame_copy2, markers, ids)
+    cv2.imshow("detected markers (refined)", frame_copy2)
+    cv2.waitKey(1)
+    cv2.imwrite("2_detect_markers_refined.png", frame_copy2)
+
     ok = ids is not None and len(ids) > 15
     if ok:
         (num_refined, chess_corners, chess_ids) = cv2.aruco.interpolateCornersCharuco(markers, ids, frame, board, minMarkers=1)
+
+        frame_copy3 = frame.copy()
+        cv2.aruco.drawDetectedCornersCharuco(frame_copy3, chess_corners, chess_ids)
+        cv2.imshow("detected interpol. corners", frame_copy3)
+        cv2.waitKey(1)
+        cv2.imwrite("3_detect_corners_interpol.png", frame_copy3)
+
         ok = num_refined > 15
 
     if not ok:
