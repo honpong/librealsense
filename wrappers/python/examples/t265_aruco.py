@@ -173,7 +173,7 @@ def calibrate_observations(camera_name):
     #print(ip.shape)
     #object_points = np.reshape(op, (1, 1, -1, 3))
     #image_points = np.reshape(ip, (1, 1, -1, 2))
-    flags = cv2.fisheye.CALIB_FIX_SKEW
+    flags = cv2.fisheye.CALIB_FIX_SKEW | cv2.fisheye.CALIB_RECOMPUTE_EXTRINSIC
     D = np.array([-0.00626438, 0.0493399, -0.0463255, 0.00896666])
     K = np.zeros((3,3))
     image_size = (848, 800)
