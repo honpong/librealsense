@@ -138,21 +138,29 @@ int main(int c, char * v[]) try
 
     if (playback_file)
         cfg.enable_device_from_file(playback_file);
-    else if (serial)
-        cfg.enable_device(serial);
-    //cfg.enable_all_streams();
-    cfg.disable_stream(RS2_STREAM_COLOR);
-    cfg.disable_stream(RS2_STREAM_DEPTH);
-    //cfg.enable_stream(RS2_STREAM_INFRARED, 1, RS2_FORMAT_Y8);
-    //cfg.enable_stream(RS2_STREAM_INFRARED, 2, RS2_FORMAT_Y8);
-    cfg.enable_stream(RS2_STREAM_FISHEYE, 1, RS2_FORMAT_Y8);
-    cfg.enable_stream(RS2_STREAM_FISHEYE, 2, RS2_FORMAT_Y8);
-    cfg.enable_stream(RS2_STREAM_GYRO);
-    cfg.enable_stream(RS2_STREAM_ACCEL);
-    cfg.enable_stream(RS2_STREAM_POSE); // This is just configured for the sake of the pose reference
+    else for (const rs2::device &d : ctx.query_devices()) {
+        const char *d_serial = d.supports(RS2_CAMERA_INFO_SERIAL_NUMBER) ? d.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER) : nullptr;
+        if (serial && (!d_serial || 0 != strcmp(serial, d_serial)))
+            continue;
+        if (d_serial)
+            cfg.enable_device(d_serial);
+        for (const rs2::sensor &s : d.query_sensors()) {
+            for (const rs2::stream_profile &p : s.get_stream_profiles()) {
+                if      (p.stream_type() == RS2_STREAM_GYRO)                  cfg.enable_stream(RS2_STREAM_GYRO,     p.stream_index());
+                else if (p.stream_type() == RS2_STREAM_ACCEL)                 cfg.enable_stream(RS2_STREAM_ACCEL,    p.stream_index());
+                else if (p.stream_type() == RS2_STREAM_DEPTH)                 cfg.enable_stream(RS2_STREAM_DEPTH,    p.stream_index());
+                else if (p.stream_type() == RS2_STREAM_INFRARED)              cfg.enable_stream(RS2_STREAM_INFRARED, p.stream_index(), RS2_FORMAT_Y8);
+                else if (p.stream_type() == RS2_STREAM_FISHEYE)               cfg.enable_stream(RS2_STREAM_FISHEYE,  p.stream_index(), RS2_FORMAT_Y8);
+                else if (p.stream_type() == RS2_STREAM_POSE)                  cfg.enable_stream(RS2_STREAM_POSE,     p.stream_index()); // This is just configured for the sake of the pose reference
+            }
+        }
+        break;
+    }
+
+    rs2::pipeline_profile pipeline_profile = cfg.resolve(pipe);
 
     std::unique_ptr<rc_Tracker, void (*)(rc_Tracker *)> rc = { rc_create(), rc_destroy };
-    rs2::pipeline_profile pipeline_profile = cfg.resolve(pipe);
+
     std::unordered_map<int,int> sensor_id;
 
     rc_setMessageCallback(rc.get(), [](void *handle, rc_MessageLevel message_level, const char *message, size_t len) { std::cout.write(message,len); }, nullptr, rc_MESSAGE_INFO);
