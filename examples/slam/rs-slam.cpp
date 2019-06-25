@@ -112,7 +112,7 @@ int main(int c, char * v[]) try
     if (0) { usage: std::cerr << "Usage: " << v[0] << " [--serial <number>] [--record-time <seconds>] [--track] [<file.rc>]\n"; return 1; }
 
     const char *recording_file = nullptr, *serial = nullptr, *calibration_json = nullptr, *playback_file = nullptr;
-    bool stream = false, track = false; double record_time_s = 0;
+    bool stream = false, track = false, enable_depth = false, use_depth = true; double record_time_s = 0;
 
     for (int i=1; i<c; i++)
         if      (v[i][0] != '-' && !recording_file) recording_file = v[i];
@@ -123,6 +123,8 @@ int main(int c, char * v[]) try
         else if (strcmp(v[i], "--record-time") == 0 && i+1 < c) record_time_s = std::stod(v[++i]);
         else if (strcmp(v[i], "--track") == 0) track = true;
         else if (strcmp(v[i], "--stream") == 0) stream = true;
+        else if (strcmp(v[i], "--enable-depth") == 0) enable_depth = true;
+        else if (strcmp(v[i], "--use-depth") == 0) use_depth = true;
         else goto usage;
 
     if (!recording_file && !track && !stream)
@@ -148,7 +150,7 @@ int main(int c, char * v[]) try
             for (const rs2::stream_profile &p : s.get_stream_profiles()) {
                 if      (p.stream_type() == RS2_STREAM_GYRO)                  cfg.enable_stream(RS2_STREAM_GYRO,     p.stream_index());
                 else if (p.stream_type() == RS2_STREAM_ACCEL)                 cfg.enable_stream(RS2_STREAM_ACCEL,    p.stream_index());
-                else if (p.stream_type() == RS2_STREAM_DEPTH)                 cfg.enable_stream(RS2_STREAM_DEPTH,    p.stream_index());
+                else if (p.stream_type() == RS2_STREAM_DEPTH && enable_depth) cfg.enable_stream(RS2_STREAM_DEPTH,    p.stream_index());
                 else if (p.stream_type() == RS2_STREAM_INFRARED)              cfg.enable_stream(RS2_STREAM_INFRARED, p.stream_index(), RS2_FORMAT_Y8);
                 else if (p.stream_type() == RS2_STREAM_FISHEYE)               cfg.enable_stream(RS2_STREAM_FISHEYE,  p.stream_index(), RS2_FORMAT_Y8);
                 else if (p.stream_type() == RS2_STREAM_POSE)                  cfg.enable_stream(RS2_STREAM_POSE,     p.stream_index()); // This is just configured for the sake of the pose reference
@@ -340,7 +342,7 @@ int main(int c, char * v[]) try
     //rc_setOutputLog(rc.get(), "/tmp/t.rc", rc_RUN_ASYNCHRONOUS);
     if (track) rc_startTracker(rc.get(), rc_RUN_ASYNCHRONOUS | rc_RUN_FAST_PATH | rc_RUN_RELOCALIZATION | rc_RUN_POSE_JUMP);
 
-    pipe.start(cfg, [&rc,&sensor_id](const rs2::frame& frame) {
+    pipe.start(cfg, [&rc,&sensor_id, &use_depth](const rs2::frame& frame) {
         try {
         if (frame.is<rs2::frameset>()) {
             auto fs = frame.as<rs2::frameset>();
@@ -365,7 +367,7 @@ int main(int c, char * v[]) try
                     const auto &v = f.as<rs2::video_frame>();
                     const auto &p = fp.as<rs2::video_stream_profile>();
                     bool on = is_emitter_on(v);
-                    if ((fp.format() == RS2_FORMAT_Y8 && on) || (fp.format() == RS2_FORMAT_Z16 && !on)) std::cout << "    skipping " << v.get_profile().stream_name() << " with emitter " << (on ? "on" : "off") << "\n"; else
+                    if ((fp.format() == RS2_FORMAT_Y8 && on) || (fp.format() == RS2_FORMAT_Z16 && (!on || !use_depth))) std::cout << "    skipping " << v.get_profile().stream_name() << " with emitter " << (on ? "on" : "off") << "\n"; else
                     if (!rc_receiveImage(rc.get(), sensor_id[p.unique_id()], p.format() == RS2_FORMAT_Y8 ? rc_FORMAT_GRAY8 : rc_FORMAT_DEPTH16,
                                          to_rc_Timestamp_and_exposure(v).first, to_rc_Timestamp_and_exposure(v).second,
                                          v.get_width(), v.get_height(), v.get_stride_in_bytes(),
@@ -383,7 +385,7 @@ int main(int c, char * v[]) try
                 const rs2::video_frame &v = frame.as<rs2::video_frame>();
                 const rs2::video_stream_profile &p = s.as<rs2::video_stream_profile>();
                 bool on = is_emitter_on(v);
-                if ((s.format() == RS2_FORMAT_Y8 && on) || (s.format() == RS2_FORMAT_Z16 && !on)) std::cout << "skipping " << v.get_profile().stream_name() << " with emitter " << (on ? "on" : "off") << "\n"; else
+                if ((s.format() == RS2_FORMAT_Y8 && on) || (s.format() == RS2_FORMAT_Z16 && (!on || !use_depth))) std::cout << "    skipping " << v.get_profile().stream_name() << " with emitter " << (on ? "on" : "off") << "\n"; else
                 if (!rc_receiveImage(rc.get(), sensor_id[p.unique_id()], p.format() == RS2_FORMAT_Y8 ? rc_FORMAT_GRAY8 : rc_FORMAT_DEPTH16,
                                      to_rc_Timestamp_and_exposure(v).first, to_rc_Timestamp_and_exposure(v).second,
                                      v.get_width(), v.get_height(), v.get_stride_in_bytes(),
