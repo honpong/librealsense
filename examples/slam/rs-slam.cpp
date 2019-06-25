@@ -159,6 +159,33 @@ int main(int c, char * v[]) try
 
     rs2::pipeline_profile pipeline_profile = cfg.resolve(pipe);
 
+    {
+        bool has_depth = false;
+        for (rs2::stream_profile &p : pipeline_profile.get_streams())
+            if (p.stream_type() == RS2_STREAM_DEPTH)
+                has_depth = true;
+
+        for (rs2::sensor &s : pipeline_profile.get_device().query_sensors()) {
+            if (has_depth && s.supports(RS2_OPTION_EMITTER_ON_OFF)) {
+                if (!s.get_option(RS2_OPTION_EMITTER_ON_OFF))
+                    s.set_option(RS2_OPTION_EMITTER_ON_OFF, 1);
+            } else if (s.supports(RS2_OPTION_EMITTER_ENABLED)) {
+                if (s.get_option(RS2_OPTION_EMITTER_ENABLED))
+                    s.set_option(RS2_OPTION_EMITTER_ENABLED, 0);
+            }
+
+            if (s.supports(RS2_OPTION_FRAMES_QUEUE_SIZE)) {
+                if (auto size = s.get_option(RS2_OPTION_FRAMES_QUEUE_SIZE))
+                    s.set_option(RS2_OPTION_FRAMES_QUEUE_SIZE, 0);
+            }
+
+            if (s.supports(RS2_OPTION_ENABLE_MOTION_CORRECTION))
+                s.set_option(RS2_OPTION_ENABLE_MOTION_CORRECTION, 0);
+            if (s.supports(RS2_OPTION_AUTO_EXPOSURE_PRIORITY))
+                s.set_option(RS2_OPTION_AUTO_EXPOSURE_PRIORITY, 0);
+        }
+    }
+
     std::unique_ptr<rc_Tracker, void (*)(rc_Tracker *)> rc = { rc_create(), rc_destroy };
 
     std::unordered_map<int,int> sensor_id;
