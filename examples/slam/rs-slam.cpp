@@ -332,6 +332,8 @@ int main(int c, char * v[]) try
         else if (data->path == rc_DATA_PATH_SLOW) rc_software_pose::data_callback((void*)&fs.slow, tracker, data);
     }, (void *)&fast_slow);
 
+    dev.add_to(ctx);
+
     // either or both of these
     if (recording_file) rc_startCapture(rc.get(), rc_RUN_ASYNCHRONOUS, [](void *handle, const void *buffer, size_t length) {
         if (buffer)
