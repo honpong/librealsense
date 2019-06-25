@@ -107,9 +107,11 @@ static bool is_emitter_on(const rs2::frame &f) {
     return false;
 }
 
+//static rs2::processing_block x;
+
 int main(int c, char * v[]) try
 {
-    if (0) { usage: std::cerr << "Usage: " << v[0] << " [--serial <number>] [--record-time <seconds>] [--track] [<file.rc>]\n"; return 1; }
+    if (0) { usage: std::cerr << "Usage: " << v[0] << " [--serial <number>] [--enable-depth] [--use-depth] [--record-time <seconds>] [--stream] [--track] [--save-json <file.json>] [--play <file.bag>] [[--record] <file.rc>]\n"; return 1; }
 
     const char *recording_file = nullptr, *serial = nullptr, *calibration_json = nullptr, *playback_file = nullptr;
     bool stream = false, track = false, enable_depth = false, use_depth = true; double record_time_s = 0;
