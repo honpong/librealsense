@@ -405,7 +405,9 @@ int main(int c, char * v[]) try
                     if (!rc_receiveAccelerometer(rc.get(), sensor_id[p.unique_id()], to_rc_Timestamp(m), rc_Vector{{ d.x, d.y, d.z }}))
                         throw std::runtime_error(to_string() << "failed receive for frame " << s);
                 }
-            }
+            } else if (s.format() == RS2_FORMAT_6DOF) {
+            } else
+                throw std::runtime_error(to_string() << "unexpected frame " << s);
         }
         } catch (const rs2::error & e) {
             std::cerr << "callback failed " << e.get_failed_function() << "(" << e.get_failed_args() << "):\n    " << e.what() << std::endl;
