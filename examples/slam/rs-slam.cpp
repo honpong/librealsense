@@ -423,6 +423,8 @@ int main(int c, char * v[]) try
         { std::cerr << "press return to finish recording:"; std::getchar(); }
 
     pipe.stop();
+    if (recording_file)
+        printf("pipe stoppped; flushing recording\n");
     rc_stopTracker(rc.get());
 
     return EXIT_SUCCESS;
