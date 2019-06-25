@@ -204,6 +204,7 @@ int main(int c, char * v[]) try
             std::cout << s.stream_name() << "\n";
             switch (s.stream_type()) {
             case RS2_STREAM_POSE: break; // added only for the extrinsics reference
+            case RS2_STREAM_COLOR: break; // ignored by slam for now
             case RS2_STREAM_FISHEYE:
             case RS2_STREAM_INFRARED: {
                 rc_CameraIntrinsics in = rc_from_rs(s.as<rs2::video_stream_profile>().get_intrinsics());
