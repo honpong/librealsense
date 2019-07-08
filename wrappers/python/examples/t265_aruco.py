@@ -302,7 +302,7 @@ try:
                 if good:
                     add_observation("left", object_points, image_points, chess_ids)
                     print("good left image")
-                    if len(observations["left"]) > 10:
+                    if len(observations["left"]) > 0:
                         calibrate_observations("left")
             """
             (ok, object_points, image_points, chess_ids) = detect_markers(frame_copy["right"])
