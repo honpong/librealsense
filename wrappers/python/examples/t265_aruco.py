@@ -28,6 +28,8 @@ import pyrealsense2 as rs
 # Import OpenCV and numpy
 import cv2
 import numpy as np
+import math as m
+import matplotlib.pyplot as plt
 
 """
 Returns R, T transform from src to dst
@@ -180,14 +182,46 @@ def min_dist_for_id(camera_name, feature_id, image_point):
             min_dist = dist
     return min_dist
 
+def evaluate_calibration(object_points, image_points, identification, rvec, tvec, K, D):
+    rms = 0.0
+    N = 0
+    Nframes = len(object_points)  # number of frames
+    for i in range(Nframes):
+        proj = cv2.fisheye.projectPoints(object_points[i], rvec[i], tvec[i], K, D)
+        proj_err = image_points[i][0] - proj[0][0]
+        plt.scatter(proj_err[:,0], proj_err[:,1])
+
+        Npoints = object_points[0].shape[1]  # number of points
+        for j in range(Npoints):
+            #print(j)
+            #print(image_points[i][0][j])
+            #print(proj[i][0][j])
+            proj_err = image_points[i][0][j] - proj[0][0][j]
+            #print(proj_err)
+
+            plt.text(proj_err[0], proj_err[1], str(i)+","+str(identification[i][j][0]))
+
+            rms = rms + np.array(proj_err).dot(proj_err)
+        N = N + Npoints
+    rms = m.sqrt(rms/N)
+    #print("rms:", rms)
+
+    plt.savefig("reproj_err.png")
+    #plt.show()
+    plt.show(block=False)
+    plt.pause(3)
+    plt.close()
+
 def calibrate_observations(camera_name):
     obs = observations[camera_name]
     object_points = []
     image_points = []
+    identification = []
     for (id_to_image_pt, obj_i, img_i, ids) in obs:
         print(obj_i.shape)
         object_points.append(obj_i)
         image_points.append(img_i)
+        identification.append(ids)
     #op = np.concatenate(object_points, axis=1)
     #ip = np.concatenate(image_points, axis=1)
     #print("P{", op.shape)
@@ -211,7 +245,9 @@ def calibrate_observations(camera_name):
     print("distortion_coeffs", distortion_coeffs)
     #print("rvec", rvec)
     #print("tvec", tvec)
-    
+
+    evaluate_calibration(object_points, image_points, identification, rvec, tvec, camera_matrix, distortion_coeffs)
+
 try:
     # Retreive the stream and intrinsic properties for both cameras
     profiles = pipe.get_active_profile()
