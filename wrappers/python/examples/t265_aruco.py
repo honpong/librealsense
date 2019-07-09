@@ -92,10 +92,11 @@ cfg = rs.config()
 # Start streaming with our callback
 pipe.start(cfg, callback)
 
-board_width = 16
-board_height = 10
-checker_size_m = 0.015
-april_size_m = 0.0075
+factor = 2
+board_width = int(16/factor)
+board_height = int(10/factor)
+checker_size_m = 0.015*factor
+april_size_m = 0.0075*factor
 dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_1000)
 board = cv2.aruco.CharucoBoard_create(board_width, board_height, checker_size_m, april_size_m, dictionary)
 parameters = cv2.aruco.DetectorParameters_create()
