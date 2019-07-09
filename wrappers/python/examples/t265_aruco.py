@@ -72,7 +72,7 @@ def fisheye_distortion(intrinsics):
 
 
 
-def detect_markers(frame):
+def detect_markers(frame, K, D):
     (markers, ids, rejected) = cv2.aruco.detectMarkers(frame, dictionary, parameters=parameters)
 
     frame_copy = frame.copy()
@@ -91,7 +91,7 @@ def detect_markers(frame):
 
     ok = ids is not None and len(ids) > 15
     if ok:
-        (num_refined, chess_corners, chess_ids) = cv2.aruco.interpolateCornersCharuco(markers, ids, frame, board, minMarkers=1)
+        (num_refined, chess_corners, chess_ids) = cv2.aruco.interpolateCornersCharuco(markers, ids, frame, board, minMarkers=2, cameraMatrix=K) #, distCoeffs=D)
 
         frame_copy3 = frame.copy()
         cv2.aruco.drawDetectedCornersCharuco(frame_copy3, chess_corners, chess_ids)
@@ -302,7 +302,17 @@ try:
                           "right" : frame_data["right"].copy()}
             frame_mutex.release()
 
-            (ok, object_points, image_points, chess_ids) = detect_markers(frame_copy["left"])
+            # undistort
+            frame = frame_copy["left"]
+            cv2.imwrite("0_distorted.png", frame)
+            frame_ud = cv2.fisheye.undistortImage(frame, K_left, D_left, None, K_left) # keep same K
+            cv2.imshow("undistorted", frame_ud)
+            cv2.waitKey(1)
+            cv2.imwrite("0_undistorted.png", frame_ud)
+
+            #(ok, object_points, image_points, chess_ids) = detect_markers(frame_copy["left"], K_left, D_left)
+            (ok, object_points, image_points, chess_ids) = detect_markers(frame_ud, K_left, D_left)  # undistort first
+
             if ok:
                 good = True
                 for i in range(len(chess_ids)):
