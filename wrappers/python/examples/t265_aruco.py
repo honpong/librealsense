@@ -161,7 +161,7 @@ def evaluate_calibration(object_points, image_points, identification, rvec, tvec
         proj_err = image_points[i][0] - proj[0][0]
         plt.scatter(proj_err[:,0], proj_err[:,1])
 
-        Npoints = object_points[0].shape[1]  # number of points
+        Npoints = len(image_points[i][0])  # number of points
         for j in range(Npoints):
             #print(j)
             #print(image_points[i][0][j])
