@@ -31,6 +31,22 @@ import numpy as np
 import math as m
 import matplotlib.pyplot as plt
 
+
+flags = cv2.fisheye.CALIB_FIX_SKEW | cv2.fisheye.CALIB_RECOMPUTE_EXTRINSIC
+criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 500, 0.5)
+
+factor = 2
+board_width = int(16/factor)
+board_height = int(10/factor)
+checker_size_m = 0.015*factor
+april_size_m = 0.0075*factor
+dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_1000)
+board = cv2.aruco.CharucoBoard_create(board_width, board_height, checker_size_m, april_size_m, dictionary)
+parameters = cv2.aruco.DetectorParameters_create()
+#parameters.adaptiveThreshWinSizeStep = 2
+#parameters.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_SUBPIX
+
+
 """
 Returns R, T transform from src to dst
 """
@@ -54,54 +70,7 @@ Returns the fisheye distortion from librealsense intrinsics
 def fisheye_distortion(intrinsics):
     return np.array(intrinsics.coeffs[:4])
 
-# Set up a mutex to share data between threads 
-from threading import Lock
-frame_mutex = Lock()
-frame_data = {"left"  : None,
-              "right" : None,
-              "timestamp_ms" : None
-              }
 
-"""
-This callback is called on a separate thread, so we must use a mutex
-to ensure that data is synchronized properly. We should also be
-careful not to do much work on this thread to avoid data backing up in the
-callback queue.
-"""
-def callback(frame):
-    global frame_data
-    if frame.is_frameset():
-        frameset = frame.as_frameset()
-        f1 = frameset.get_fisheye_frame(1).as_video_frame()
-        f2 = frameset.get_fisheye_frame(2).as_video_frame()
-        left_data = np.asanyarray(f1.get_data())
-        right_data = np.asanyarray(f2.get_data())
-        ts = frameset.get_timestamp()
-        frame_mutex.acquire()
-        frame_data["left"] = left_data
-        frame_data["right"] = right_data
-        frame_data["timestamp_ms"] = ts
-        frame_mutex.release()
-
-# Declare RealSense pipeline, encapsulating the actual device and sensors
-pipe = rs.pipeline()
-
-# Build config object and stream everything
-cfg = rs.config()
-
-# Start streaming with our callback
-pipe.start(cfg, callback)
-
-factor = 2
-board_width = int(16/factor)
-board_height = int(10/factor)
-checker_size_m = 0.015*factor
-april_size_m = 0.0075*factor
-dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_1000)
-board = cv2.aruco.CharucoBoard_create(board_width, board_height, checker_size_m, april_size_m, dictionary)
-parameters = cv2.aruco.DetectorParameters_create()
-#parameters.adaptiveThreshWinSizeStep = 2
-#parameters.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_SUBPIX
 
 def detect_markers(frame):
     (markers, ids, rejected) = cv2.aruco.detectMarkers(frame, dictionary, parameters=parameters)
@@ -172,7 +141,7 @@ def add_observation(camera_name, object_points, image_points, ids):
         id_to_image_pt[ids[i,0]] = image_points[0,i,:]
 
     observations[camera_name].append((id_to_image_pt, object_points, image_points, ids))
-    print("Total observations for %s: %d" % (camera_name, len(observations[camera_name]))) 
+    print("Total observations for %s: %d" % (camera_name, len(observations[camera_name])))
 
 def min_dist_for_id(camera_name, feature_id, image_point):
     min_dist = 1000
@@ -219,7 +188,7 @@ def calibrate_observations(camera_name):
     image_points = []
     identification = []
     for (id_to_image_pt, obj_i, img_i, ids) in obs:
-        print(obj_i.shape)
+        #print(obj_i.shape)
         object_points.append(obj_i)
         image_points.append(img_i)
         identification.append(ids)
@@ -229,7 +198,6 @@ def calibrate_observations(camera_name):
     #print(ip.shape)
     #object_points = np.reshape(op, (1, 1, -1, 3))
     #image_points = np.reshape(ip, (1, 1, -1, 2))
-    flags = cv2.fisheye.CALIB_FIX_SKEW | cv2.fisheye.CALIB_RECOMPUTE_EXTRINSIC
     D = np.array([-0.00626438, 0.0493399, -0.0463255, 0.00896666])
     K = np.zeros((3,3))
     image_size = (848, 800)
@@ -240,7 +208,7 @@ def calibrate_observations(camera_name):
                                                                                     K = None,
                                                                                     D = D,
                                                                                     flags = flags,
-                                                                                    criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 500, 0.5))
+                                                                                    criteria = criteria)
     print("rms", rms_error)
     print("camera", camera_matrix)
     print("distortion_coeffs", distortion_coeffs)
@@ -249,7 +217,48 @@ def calibrate_observations(camera_name):
 
     evaluate_calibration(object_points, image_points, identification, rvec, tvec, camera_matrix, distortion_coeffs)
 
+
+# Set up a mutex to share data between threads
+from threading import Lock
+frame_mutex = Lock()
+frame_data = {"left"  : None,
+              "right" : None,
+              "timestamp_ms" : None
+              }
+
+"""
+This callback is called on a separate thread, so we must use a mutex
+to ensure that data is synchronized properly. We should also be
+careful not to do much work on this thread to avoid data backing up in the
+callback queue.
+"""
+def callback(frame):
+    global frame_data
+    if frame.is_frameset():
+        frameset = frame.as_frameset()
+        f1 = frameset.get_fisheye_frame(1).as_video_frame()
+        f2 = frameset.get_fisheye_frame(2).as_video_frame()
+        left_data = np.asanyarray(f1.get_data())
+        right_data = np.asanyarray(f2.get_data())
+        ts = frameset.get_timestamp()
+        frame_mutex.acquire()
+        frame_data["left"] = left_data
+        frame_data["right"] = right_data
+        frame_data["timestamp_ms"] = ts
+        frame_mutex.release()
+
+
 try:
+    # Declare RealSense pipeline, encapsulating the actual device and sensors
+    pipe = rs.pipeline()
+
+    # Build config object and stream everything
+    cfg = rs.config()
+
+    # Start streaming with our callback
+    pipe.start(cfg, callback)
+
+
     # Retreive the stream and intrinsic properties for both cameras
     profiles = pipe.get_active_profile()
     streams = {"left"  : profiles.get_stream(rs.stream.fisheye, 1).as_video_stream_profile(),
