@@ -151,7 +151,13 @@ def min_dist_for_id(camera_name, feature_id, image_point):
 def theta_d(theta, D):
     return theta*( 1+D[0]*np.power(theta,2)+D[1]*np.power(theta,4)+D[2]*np.power(theta,6)+D[3]*np.power(theta,8) )
 
-def evaluate_calibration(object_points, image_points, identification, rvec, tvec, K, D, Dorig):
+def evaluate_calibration(object_points, image_points, identification, rvec, tvec, K, D, Korig, Dorig):
+    print("dfx[%]:", (K[0,0]/Korig[0,0]-1)*100 )  # to percent
+    print("dfy[%]:", (K[1,1]/Korig[1,1]-1)*100 )  # to percent
+    print("cx[px]:", K[0,2]/Korig[0,2])
+    print("cy[px]:", K[1,2]/Korig[1,2])
+    # TODO: D 70, 80, 85, 90
+
     rms = 0.0
     N = 0
     Nframes = len(object_points)  # number of frames
@@ -181,6 +187,8 @@ def evaluate_calibration(object_points, image_points, identification, rvec, tvec
     plt.pause(3)
     plt.close()
 
+    # support
+
     # distortion
     theta = np.linspace(0,m.pi/2)
 
@@ -190,9 +198,9 @@ def evaluate_calibration(object_points, image_points, identification, rvec, tvec
     plt.figure()
     plt.xlabel('deg')
 
-    plt.plot(theta/m.pi*180, theta_d(theta, D))
-    plt.plot(theta/m.pi*180, theta_d(theta, Dmean), '--')
-    plt.plot(theta/m.pi*180, theta_d(theta, Dorig))
+    plt.plot(theta, theta_d(theta, D))
+    plt.plot(theta, theta_d(theta, Dmean), '--')
+    plt.plot(theta, theta_d(theta, Dorig))
     #plt.plot(theta/m.pi*180, theta_d(theta, D)/theta - theta_d(theta, Dmean)/theta)
 
     #plt.plot([0,90],[0,0],'k--')
@@ -209,15 +217,15 @@ def evaluate_calibration(object_points, image_points, identification, rvec, tvec
     plt.figure()
     plt.xlabel('deg')
 
-    plt.plot(theta/m.pi*180, theta_d(theta, D)/theta-1)
-    plt.plot(theta/m.pi*180, theta_d(theta, Dmean)/theta-1, '--')
-    plt.plot(theta/m.pi*180, theta_d(theta, Dorig)/theta-1)
-    plt.plot(theta/m.pi*180, theta_d(theta, D)/theta - theta_d(theta, Dmean)/theta)
-    plt.plot(theta/m.pi*180, theta_d(theta, D)/theta - theta_d(theta, Dorig)/theta)
+    plt.plot(theta, theta_d(theta, D)/theta-1)
+    plt.plot(theta, theta_d(theta, Dmean)/theta-1, '--')
+    plt.plot(theta, theta_d(theta, Dorig)/theta-1)
+    plt.plot(theta, theta_d(theta, D)/theta - theta_d(theta, Dmean)/theta)
+    plt.plot(theta, theta_d(theta, D)/theta - theta_d(theta, Dorig)/theta)
 
-    plt.plot([0,90],[0,0],'k--')
-    plt.plot([0,90],[0.01,0.01],'b--')
-    plt.plot([0,90],[-0.01,-0.01],'b--')
+    plt.plot([0,m.pi/2],[0,0],'k--')
+    plt.plot([0,m.pi/2],[0.01,0.01],'b--')
+    plt.plot([0,m.pi/2],[-0.01,-0.01],'b--')
 
     plt.legend(['new','mean','orig', 'delta_mean', 'delta_orig', '1%'])
 
@@ -227,7 +235,7 @@ def evaluate_calibration(object_points, image_points, identification, rvec, tvec
     plt.pause(3)
     plt.close()
 
-def calibrate_observations(camera_name, Dorig):
+def calibrate_observations(camera_name, Korig, Dorig):
     obs = observations[camera_name]
     object_points = []
     image_points = []
@@ -260,7 +268,7 @@ def calibrate_observations(camera_name, Dorig):
     #print("rvec", rvec)
     #print("tvec", tvec)
 
-    evaluate_calibration(object_points, image_points, identification, rvec, tvec, camera_matrix, distortion_coeffs, Dorig)
+    evaluate_calibration(object_points, image_points, identification, rvec, tvec, camera_matrix, distortion_coeffs, Korig, Dorig)
 
 
 # Set up a mutex to share data between threads
@@ -368,7 +376,7 @@ try:
                     add_observation("left", object_points, image_points, chess_ids)
                     print("good left image")
                     if len(observations["left"]) > 0:
-                        calibrate_observations("left", D_left)
+                        calibrate_observations("left", K_left, D_left)
             """
             (ok, object_points, image_points, chess_ids) = detect_markers(frame_copy["right"])
             if ok:
