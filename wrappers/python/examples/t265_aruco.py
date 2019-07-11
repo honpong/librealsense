@@ -4,7 +4,6 @@
 ## Copyright(c) 2019 Intel Corporation. All Rights Reserved.
 # Python 2/3 compatibility
 from __future__ import print_function
-import sys
 
 """
 First, set up the virtual enviroment:
@@ -22,10 +21,7 @@ $ source py3librs/bin/activate  # Activate the virtual environment
 $ python3 t265_aruco.py        # Run the example
 """
 
-# First import the library
 import pyrealsense2 as rs
-
-# Import OpenCV and numpy
 import cv2
 import numpy as np
 import math as m
@@ -91,7 +87,7 @@ def detect_markers(frame, K, D):
 
     ok = ids is not None and len(ids) > 15
     if ok:
-        (num_refined, chess_corners, chess_ids) = cv2.aruco.interpolateCornersCharuco(markers, ids, frame, board, minMarkers=2, cameraMatrix=K) #, distCoeffs=D)
+        (num_refined, chess_corners, chess_ids) = cv2.aruco.interpolateCornersCharuco(markers, ids, frame, board, minMarkers=2) #, cameraMatrix=K) #, distCoeffs=D)
 
         frame_copy3 = frame.copy()
         cv2.aruco.drawDetectedCornersCharuco(frame_copy3, chess_corners, chess_ids)
@@ -152,7 +148,10 @@ def min_dist_for_id(camera_name, feature_id, image_point):
             min_dist = dist
     return min_dist
 
-def evaluate_calibration(object_points, image_points, identification, rvec, tvec, K, D):
+def theta_d(theta, D):
+    return theta*( 1+D[0]*np.power(theta,2)+D[1]*np.power(theta,4)+D[2]*np.power(theta,6)+D[3]*np.power(theta,8) )
+
+def evaluate_calibration(object_points, image_points, identification, rvec, tvec, K, D, Dorig):
     rms = 0.0
     N = 0
     Nframes = len(object_points)  # number of frames
@@ -182,7 +181,53 @@ def evaluate_calibration(object_points, image_points, identification, rvec, tvec
     plt.pause(3)
     plt.close()
 
-def calibrate_observations(camera_name):
+    # distortion
+    theta = np.linspace(0,m.pi/2)
+
+    Dmean = np.array([-0.00626438, 0.0493399, -0.0463255, 0.00896666])
+    Dorig = [-0.00217445590533316,  	0.0376055203378201,  	-0.0364043116569519,  0.00593686196953058]  # TODO: read
+
+    plt.figure()
+    plt.xlabel('deg')
+
+    plt.plot(theta/m.pi*180, theta_d(theta, D))
+    plt.plot(theta/m.pi*180, theta_d(theta, Dmean), '--')
+    plt.plot(theta/m.pi*180, theta_d(theta, Dorig))
+    #plt.plot(theta/m.pi*180, theta_d(theta, D)/theta - theta_d(theta, Dmean)/theta)
+
+    #plt.plot([0,90],[0,0],'k--')
+    #plt.plot([0,90],[-0.01,-0.01],'--')
+
+    plt.legend(['new','mean','orig'])
+    plt.savefig("theta_d.png")
+    #plt.show()
+    plt.show(block=False)
+    plt.pause(3)
+    plt.close()
+
+
+    plt.figure()
+    plt.xlabel('deg')
+
+    plt.plot(theta/m.pi*180, theta_d(theta, D)/theta-1)
+    plt.plot(theta/m.pi*180, theta_d(theta, Dmean)/theta-1, '--')
+    plt.plot(theta/m.pi*180, theta_d(theta, Dorig)/theta-1)
+    plt.plot(theta/m.pi*180, theta_d(theta, D)/theta - theta_d(theta, Dmean)/theta)
+    plt.plot(theta/m.pi*180, theta_d(theta, D)/theta - theta_d(theta, Dorig)/theta)
+
+    plt.plot([0,90],[0,0],'k--')
+    plt.plot([0,90],[0.01,0.01],'b--')
+    plt.plot([0,90],[-0.01,-0.01],'b--')
+
+    plt.legend(['new','mean','orig', 'delta_mean', 'delta_orig', '1%'])
+
+    plt.savefig("distortion.png")
+    #plt.show()
+    plt.show(block=False)
+    plt.pause(3)
+    plt.close()
+
+def calibrate_observations(camera_name, Dorig):
     obs = observations[camera_name]
     object_points = []
     image_points = []
@@ -211,11 +256,11 @@ def calibrate_observations(camera_name):
                                                                                     criteria = criteria)
     print("rms", rms_error)
     print("camera", camera_matrix)
-    print("distortion_coeffs", distortion_coeffs)
+    print("distortion_coeffs", np.array2string(distortion_coeffs, separator=', '))
     #print("rvec", rvec)
     #print("tvec", tvec)
 
-    evaluate_calibration(object_points, image_points, identification, rvec, tvec, camera_matrix, distortion_coeffs)
+    evaluate_calibration(object_points, image_points, identification, rvec, tvec, camera_matrix, distortion_coeffs, Dorig)
 
 
 # Set up a mutex to share data between threads
@@ -310,8 +355,8 @@ try:
             cv2.waitKey(1)
             cv2.imwrite("0_undistorted.png", frame_ud)
 
-            #(ok, object_points, image_points, chess_ids) = detect_markers(frame_copy["left"], K_left, D_left)
-            (ok, object_points, image_points, chess_ids) = detect_markers(frame_ud, K_left, D_left)  # undistort first
+            (ok, object_points, image_points, chess_ids) = detect_markers(frame_copy["left"], K_left, D_left)
+            #(ok, object_points, image_points, chess_ids) = detect_markers(frame_ud, K_left, D_left)  # undistort first
 
             if ok:
                 good = True
@@ -323,7 +368,7 @@ try:
                     add_observation("left", object_points, image_points, chess_ids)
                     print("good left image")
                     if len(observations["left"]) > 0:
-                        calibrate_observations("left")
+                        calibrate_observations("left", D_left)
             """
             (ok, object_points, image_points, chess_ids) = detect_markers(frame_copy["right"])
             if ok:
