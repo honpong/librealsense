@@ -29,6 +29,7 @@ import matplotlib.pyplot as plt
 import os
 from collections import OrderedDict
 import json
+import argparse
 
 
 flags = cv2.fisheye.CALIB_FIX_SKEW | cv2.fisheye.CALIB_RECOMPUTE_EXTRINSIC
@@ -278,14 +279,14 @@ def calibrate_observations(camera_name, Korig, Dorig):
     K = np.zeros((3,3))
     image_size = (848, 800)
 
-    (rms_error, K, D, rvec, tvec) = cv2.fisheye.calibrate(objectPoints = object_points,
+    (rmse, K, D, rvec, tvec) = cv2.fisheye.calibrate(objectPoints = object_points,
                                                                                     imagePoints = image_points,
                                                                                     image_size = image_size,
                                                                                     K = None,
                                                                                     D = D,
                                                                                     flags = flags,
                                                                                     criteria = criteria)
-    print("rms", rms_error)
+    print("rmse", rmse)
     print("camera", K)
     print("distortion_coeffs", np.array2string(D, separator=', '))
     #print("rvec", rvec)
@@ -295,7 +296,7 @@ def calibrate_observations(camera_name, Korig, Dorig):
 
     evaluate_calibration(object_points, image_points, identification, rvec, tvec, K, D, Korig, Dorig)
 
-    return (K, D)
+    return (rmse, K, D)
 
 # Set up a mutex to share data between threads
 from threading import Lock
@@ -327,12 +328,19 @@ def callback(frame):
         frame_mutex.release()
 
 
+parser = argparse.ArgumentParser()
+parser.add_argument('--path', default="images", help='image path')
+args = parser.parse_args()
+
 try:
     # Declare RealSense pipeline, encapsulating the actual device and sensors
     pipe = rs.pipeline()
 
     # Build config object and stream everything
     cfg = rs.config()
+
+    # record to rosbag (all streams)
+    cfg.enable_record_to_file(args.path+"/raw.bag");
 
     # Start streaming with our callback
     pipe.start(cfg, callback)
@@ -367,8 +375,11 @@ try:
 
     mode = "stack"
 
-    K1 = D1 = K2= D2 = None
+    #K1 = D1 = K2= D2 = None
+    n_img1 = 0
+    n_img2 = 0
     while True:
+        K1 = D1 = K2= D2 = None
         # Check if the camera has acquired any frames
         frame_mutex.acquire()
         valid = frame_data["timestamp_ms"] is not None
@@ -403,8 +414,12 @@ try:
                 if good:
                     add_observation("left", object_points, image_points, chess_ids)
                     print("good left image")
+
+                    cv2.imwrite(args.path+"/fe1_ "+str(n_img1)+".png", frame_copy["left"])
+                    n_img1 = n_img1 +1
+
                     if len(observations["left"]) > 0:
-                        (K1, D1) = calibrate_observations("left", K0l, D0l)
+                        (rms1, K1, D1) = calibrate_observations("left", K0l, D0l)
 
             # right
             (ok, object_points, image_points, chess_ids) = detect_markers(frame_copy["right"], K0r, D0r)
@@ -417,12 +432,21 @@ try:
                 if good:
                     add_observation("right", object_points, image_points, chess_ids)
                     print("good right image")
+
+                    cv2.imwrite(args.path+"/fe2_ "+str(n_img2)+".png", frame_copy["right"])
+                    n_img2 = n_img2 +1
+
                     if len(observations["right"]) > 0:
-                        (K2, D2) = calibrate_observations("right", K0r, D0r)
+                        (rms2, K2, D2) = calibrate_observations("right", K0r, D0r)
 
             if K1 is not None and K2 is not None:
-                print(K1, D1, K2, D2)
-                save_calibration(".", K1, D1, K2, D2)
+                #print(K1, D1, K2, D2)
+                save_calibration(args.path, K1, D1, K2, D2)
+
+                f = open(args.path + '/rmse.txt','a')
+                np.savetxt(f, np.array([rms1, rms2]).reshape(1,2))
+                f.close()
+
                 K1 = D1 = K2= D2 = None
 
             #color_image0 = cv2.cvtColor(frame_copy["left"], cv2.COLOR_GRAY2RGB)
