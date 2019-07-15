@@ -26,6 +26,9 @@ import cv2
 import numpy as np
 import math as m
 import matplotlib.pyplot as plt
+import os
+from collections import OrderedDict
+import json
 
 
 flags = cv2.fisheye.CALIB_FIX_SKEW | cv2.fisheye.CALIB_RECOMPUTE_EXTRINSIC
@@ -235,6 +238,26 @@ def evaluate_calibration(object_points, image_points, identification, rvec, tvec
     plt.pause(3)
     plt.close()
 
+def add_camera_calibration(K,D):
+    cam = {}
+    cam['center_px'] = [K[0,2], K[1,2]]
+    cam['focal_length_px'] = [K[0,0], K[1,1]]
+    cam['distortion'] = {}
+    cam['distortion']['type'] = 'kannalabrandt4'
+    cam['distortion']['k'] = D.tolist()
+    return cam
+
+def save_calibration(directory, K, D):
+    calib = OrderedDict()  # in order (cam1,cam2)
+    calib['cameras'] = []
+    calib['cameras'].append( add_camera_calibration(K,D) )
+    #D['cameras'].append(add_camera_calibration(intrinsics["cam2"]))
+
+    if not os.path.exists(directory):
+        os.mkdir(directory)
+    with open(directory + '/calibration.json', 'w') as f:
+        json.dump(calib, f, indent=4)
+
 def calibrate_observations(camera_name, Korig, Dorig):
     obs = observations[camera_name]
     object_points = []
@@ -267,6 +290,8 @@ def calibrate_observations(camera_name, Korig, Dorig):
     print("distortion_coeffs", np.array2string(distortion_coeffs, separator=', '))
     #print("rvec", rvec)
     #print("tvec", tvec)
+
+    save_calibration(".", camera_matrix, distortion_coeffs)
 
     evaluate_calibration(object_points, image_points, identification, rvec, tvec, camera_matrix, distortion_coeffs, Korig, Dorig)
 
