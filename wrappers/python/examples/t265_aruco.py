@@ -32,6 +32,8 @@ import json
 import argparse
 
 
+visualize = False
+
 flags = cv2.fisheye.CALIB_FIX_SKEW | cv2.fisheye.CALIB_RECOMPUTE_EXTRINSIC
 criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 500, 1e-3)
 
@@ -156,10 +158,10 @@ def theta_d(theta, D):
     return theta*( 1+D[0]*np.power(theta,2)+D[1]*np.power(theta,4)+D[2]*np.power(theta,6)+D[3]*np.power(theta,8) )
 
 def evaluate_calibration(object_points, image_points, identification, rvec, tvec, K, D, Korig, Dorig):
-    print("dfx[%]:", (K[0,0]/Korig[0,0]-1)*100 )  # to percent
-    print("dfy[%]:", (K[1,1]/Korig[1,1]-1)*100 )  # to percent
-    print("cx[px]:", K[0,2]/Korig[0,2])
-    print("cy[px]:", K[1,2]/Korig[1,2])
+    #print("dfx[%]:", (K[0,0]/Korig[0,0]-1)*100 )  # to percent
+    #print("dfy[%]:", (K[1,1]/Korig[1,1]-1)*100 )  # to percent
+    #print("cx[px]:", K[0,2]/Korig[0,2])
+    #print("cy[px]:", K[1,2]/Korig[1,2])
     # TODO: D 70, 80, 85, 90
 
     rms = 0.0
@@ -186,6 +188,7 @@ def evaluate_calibration(object_points, image_points, identification, rvec, tvec
     #print("rms:", rms)
 
     plt.savefig("reproj_err.png")
+    #if visualize:
     #plt.show()
     plt.show(block=False)
     plt.pause(3)
@@ -194,50 +197,52 @@ def evaluate_calibration(object_points, image_points, identification, rvec, tvec
     # support
 
     # distortion
-    theta = np.linspace(0,m.pi/2)
+    if visualize:
+        theta = np.linspace(0,m.pi/2)
 
-    Dmean = np.array([-0.00626438, 0.0493399, -0.0463255, 0.00896666])
-    Dorig = [-0.00217445590533316,  	0.0376055203378201,  	-0.0364043116569519,  0.00593686196953058]  # TODO: read
+        Dmean = np.array([-0.00626438, 0.0493399, -0.0463255, 0.00896666])
+        Dorig = [-0.00217445590533316,  	0.0376055203378201,  	-0.0364043116569519,  0.00593686196953058]  # TODO: read
 
-    plt.figure()
-    plt.xlabel('deg')
+        plt.figure()
+        plt.xlabel('deg')
 
-    plt.plot(theta, theta_d(theta, D))
-    plt.plot(theta, theta_d(theta, Dmean), '--')
-    plt.plot(theta, theta_d(theta, Dorig))
-    #plt.plot(theta/m.pi*180, theta_d(theta, D)/theta - theta_d(theta, Dmean)/theta)
+        plt.plot(theta, theta_d(theta, D))
+        #plt.plot(theta, theta_d(theta, Dmean), '--')
+        #plt.plot(theta, theta_d(theta, Dorig))
 
-    #plt.plot([0,90],[0,0],'k--')
-    #plt.plot([0,90],[-0.01,-0.01],'--')
+        #plt.plot(theta/m.pi*180, theta_d(theta, D)/theta - theta_d(theta, Dmean)/theta)
 
-    plt.legend(['new','mean','orig'])
-    plt.savefig("theta_d.png")
-    #plt.show()
-    plt.show(block=False)
-    plt.pause(3)
-    plt.close()
+        #plt.plot([0,90],[0,0],'k--')
+        #plt.plot([0,90],[-0.01,-0.01],'--')
 
+        plt.legend(['new','mean','orig'])
+        plt.savefig("theta_d.png")
+        #plt.show()
+        plt.show(block=False)
+        plt.pause(3)
+        plt.close()
 
-    plt.figure()
-    plt.xlabel('deg')
+    if visualize:
+        plt.figure()
+        plt.xlabel('deg')
 
-    plt.plot(theta, theta_d(theta, D)/theta-1)
-    plt.plot(theta, theta_d(theta, Dmean)/theta-1, '--')
-    plt.plot(theta, theta_d(theta, Dorig)/theta-1)
-    plt.plot(theta, theta_d(theta, D)/theta - theta_d(theta, Dmean)/theta)
-    plt.plot(theta, theta_d(theta, D)/theta - theta_d(theta, Dorig)/theta)
+        plt.plot(theta, theta_d(theta, D)/theta-1)
+        #plt.plot(theta, theta_d(theta, Dmean)/theta-1, '--')
+        #plt.plot(theta, theta_d(theta, Dorig)/theta-1)
+        #plt.plot(theta, theta_d(theta, D)/theta - theta_d(theta, Dmean)/theta)
+        #plt.plot(theta, theta_d(theta, D)/theta - theta_d(theta, Dorig)/theta)
 
-    plt.plot([0,m.pi/2],[0,0],'k--')
-    plt.plot([0,m.pi/2],[0.01,0.01],'b--')
-    plt.plot([0,m.pi/2],[-0.01,-0.01],'b--')
+        plt.plot([0,m.pi/2],[0,0],'k--')
+        plt.plot([0,m.pi/2],[0.01,0.01],'b--')
+        plt.plot([0,m.pi/2],[-0.01,-0.01],'b--')
 
-    plt.legend(['new','mean','orig', 'delta_mean', 'delta_orig', '1%'])
+        plt.legend(['new','mean','orig', 'delta_mean', 'delta_orig', '1%'])
 
-    plt.savefig("distortion.png")
-    #plt.show()
-    plt.show(block=False)
-    plt.pause(3)
-    plt.close()
+        plt.savefig("distortion.png")
+        #plt.show()
+        plt.show(block=False)
+        plt.pause(3)
+        plt.close()
 
 def add_camera_calibration(K,D):
     cam = {}
@@ -338,6 +343,8 @@ try:
     cfg = rs.config()
 
     # record to rosbag (all streams)
+    if not os.path.exists(args.path):
+        os.mkdir(args.path)
     cfg.enable_record_to_file(args.path+"/raw.bag");
 
     # Start streaming with our callback
@@ -363,8 +370,8 @@ try:
     cv2.namedWindow(WINDOW_TITLE, cv2.WINDOW_AUTOSIZE)
 
     # Print information about both cameras
-    print("Left camera:",  intrinsics["left"])
-    print("Right camera:", intrinsics["right"])
+    #print("Left camera:",  intrinsics["left"])
+    #print("Right camera:", intrinsics["right"])
 
     # Translate the intrinsics from librealsense into OpenCV
     K0l  = camera_matrix(intrinsics["left"])
