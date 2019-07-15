@@ -248,8 +248,9 @@ def add_camera_calibration(K,D):
     cam['distortion']['k'] = D.tolist()
     return cam
 
-def save_calibration(directory, K1, D1, K2, D2):
+def save_calibration(directory, sn, K1, D1, K2, D2):
     calib = OrderedDict()  # in order (cam1,cam2)
+    calib['device_id'] = sn
     calib['cameras'] = []
     calib['cameras'].append( add_camera_calibration(K1,D1) )
     calib['cameras'].append( add_camera_calibration(K2,D2) )
@@ -333,10 +334,7 @@ parser.add_argument('--path', default="images", help='image path')
 args = parser.parse_args()
 
 try:
-    # Declare RealSense pipeline, encapsulating the actual device and sensors
     pipe = rs.pipeline()
-
-    # Build config object and stream everything
     cfg = rs.config()
 
     # record to rosbag (all streams)
@@ -348,6 +346,11 @@ try:
 
     # Retreive the stream and intrinsic properties for both cameras
     profiles = pipe.get_active_profile()
+
+    dev = profiles.get_device()
+    sn = dev.get_info(rs.camera_info.serial_number)
+    print("Serial number:", sn)
+
     streams = {"left"  : profiles.get_stream(rs.stream.fisheye, 1).as_video_stream_profile(),
                "right" : profiles.get_stream(rs.stream.fisheye, 2).as_video_stream_profile()}
     intrinsics = {"left"  : streams["left"].get_intrinsics(),
@@ -441,7 +444,7 @@ try:
 
             if K1 is not None and K2 is not None:
                 #print(K1, D1, K2, D2)
-                save_calibration(args.path, K1, D1, K2, D2)
+                save_calibration(args.path, sn, K1, D1, K2, D2)
 
                 f = open(args.path + '/rmse.txt','a')
                 np.savetxt(f, np.array([rms1, rms2]).reshape(1,2))
