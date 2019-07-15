@@ -247,11 +247,11 @@ def add_camera_calibration(K,D):
     cam['distortion']['k'] = D.tolist()
     return cam
 
-def save_calibration(directory, K, D):
+def save_calibration(directory, K1, D1, K2, D2):
     calib = OrderedDict()  # in order (cam1,cam2)
     calib['cameras'] = []
-    calib['cameras'].append( add_camera_calibration(K,D) )
-    #D['cameras'].append(add_camera_calibration(intrinsics["cam2"]))
+    calib['cameras'].append( add_camera_calibration(K1,D1) )
+    calib['cameras'].append( add_camera_calibration(K2,D2) )
 
     if not os.path.exists(directory):
         os.mkdir(directory)
@@ -278,7 +278,7 @@ def calibrate_observations(camera_name, Korig, Dorig):
     K = np.zeros((3,3))
     image_size = (848, 800)
 
-    (rms_error, camera_matrix, distortion_coeffs, rvec, tvec) = cv2.fisheye.calibrate(objectPoints = object_points,
+    (rms_error, K, D, rvec, tvec) = cv2.fisheye.calibrate(objectPoints = object_points,
                                                                                     imagePoints = image_points,
                                                                                     image_size = image_size,
                                                                                     K = None,
@@ -286,15 +286,16 @@ def calibrate_observations(camera_name, Korig, Dorig):
                                                                                     flags = flags,
                                                                                     criteria = criteria)
     print("rms", rms_error)
-    print("camera", camera_matrix)
-    print("distortion_coeffs", np.array2string(distortion_coeffs, separator=', '))
+    print("camera", K)
+    print("distortion_coeffs", np.array2string(D, separator=', '))
     #print("rvec", rvec)
     #print("tvec", tvec)
 
-    save_calibration(".", camera_matrix, distortion_coeffs)
+    #save_calibration(".", K, D)
 
-    evaluate_calibration(object_points, image_points, identification, rvec, tvec, camera_matrix, distortion_coeffs, Korig, Dorig)
+    evaluate_calibration(object_points, image_points, identification, rvec, tvec, K, D, Korig, Dorig)
 
+    return (K, D)
 
 # Set up a mutex to share data between threads
 from threading import Lock
@@ -355,10 +356,10 @@ try:
     print("Right camera:", intrinsics["right"])
 
     # Translate the intrinsics from librealsense into OpenCV
-    K_left  = camera_matrix(intrinsics["left"])
-    D_left  = fisheye_distortion(intrinsics["left"])
-    K_right = camera_matrix(intrinsics["right"])
-    D_right = fisheye_distortion(intrinsics["right"])
+    K0l  = camera_matrix(intrinsics["left"])
+    D0l  = fisheye_distortion(intrinsics["left"])
+    K0r = camera_matrix(intrinsics["right"])
+    D0r = fisheye_distortion(intrinsics["right"])
     (width, height) = (intrinsics["left"].width, intrinsics["left"].height)
 
     # Get thre relative extrinsics between the left and right camera
@@ -366,6 +367,7 @@ try:
 
     mode = "stack"
 
+    K1 = D1 = K2= D2 = None
     while True:
         # Check if the camera has acquired any frames
         frame_mutex.acquire()
@@ -381,16 +383,17 @@ try:
             frame_mutex.release()
 
             # undistort
-            frame = frame_copy["left"]
-            cv2.imwrite("0_distorted.png", frame)
-            frame_ud = cv2.fisheye.undistortImage(frame, K_left, D_left, None, K_left) # keep same K
-            cv2.imshow("undistorted", frame_ud)
-            cv2.waitKey(1)
-            cv2.imwrite("0_undistorted.png", frame_ud)
+            #frame = frame_copy["left"]
+            #cv2.imwrite("0_distorted.png", frame)
+            #frame_ud = cv2.fisheye.undistortImage(frame, K1, D1, None, K_left) # keep same K
+            #cv2.imshow("undistorted", frame_ud)
+            #cv2.waitKey(1)
+            #cv2.imwrite("0_undistorted.png", frame_ud)
 
-            (ok, object_points, image_points, chess_ids) = detect_markers(frame_copy["left"], K_left, D_left)
+            #K1 = D1 = K2= D2 = None
+            # left
+            (ok, object_points, image_points, chess_ids) = detect_markers(frame_copy["left"], K0l, D0l)
             #(ok, object_points, image_points, chess_ids) = detect_markers(frame_ud, K_left, D_left)  # undistort first
-
             if ok:
                 good = True
                 for i in range(len(chess_ids)):
@@ -401,19 +404,29 @@ try:
                     add_observation("left", object_points, image_points, chess_ids)
                     print("good left image")
                     if len(observations["left"]) > 0:
-                        calibrate_observations("left", K_left, D_left)
-            """
-            (ok, object_points, image_points, chess_ids) = detect_markers(frame_copy["right"])
-            if ok:
-                for i in range(len(chess_ids)):
-                    print(len(chess_ids),image_points.shape)
-                    if min_dist_for_id(chess_ids[i], image_points[0,i,:]) > 10:
-                        print("good right image")
-                        break
-            """
+                        (K1, D1) = calibrate_observations("left", K0l, D0l)
 
-            color_image0 = cv2.cvtColor(frame_copy["left"], cv2.COLOR_GRAY2RGB)
-            cv2.imshow(WINDOW_TITLE,color_image0)
+            # right
+            (ok, object_points, image_points, chess_ids) = detect_markers(frame_copy["right"], K0r, D0r)
+            if ok:
+                good = True
+                for i in range(len(chess_ids)):
+                    if min_dist_for_id("right", chess_ids[i,0], image_points[0,i,:]) < 10:
+                        good = False
+                        break
+                if good:
+                    add_observation("right", object_points, image_points, chess_ids)
+                    print("good right image")
+                    if len(observations["right"]) > 0:
+                        (K2, D2) = calibrate_observations("right", K0r, D0r)
+
+            if K1 is not None and K2 is not None:
+                print(K1, D1, K2, D2)
+                save_calibration(".", K1, D1, K2, D2)
+                K1 = D1 = K2= D2 = None
+
+            #color_image0 = cv2.cvtColor(frame_copy["left"], cv2.COLOR_GRAY2RGB)
+            #cv2.imshow(WINDOW_TITLE,color_image0)
 
         key = cv2.waitKey(1)
         if key == ord('i'): mode = "ids"
