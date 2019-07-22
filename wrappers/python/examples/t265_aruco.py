@@ -246,6 +246,7 @@ def evaluate_calibration(object_points, image_points, identification, rvec, tvec
 
 def add_camera_calibration(K,D):
     cam = OrderedDict()
+    cam['size_px'] = [848, 800]  # TODO: read
     cam['center_px'] = [K[0,2], K[1,2]]
     cam['focal_length_px'] = [K[0,0], K[1,1]]
     cam['distortion'] = OrderedDict()
@@ -256,6 +257,8 @@ def add_camera_calibration(K,D):
 def save_calibration(directory, sn, K1, D1, K2, D2):
     calib = OrderedDict()  # in order (cam1,cam2)
     calib['device_id'] = sn
+    calib['device_type'] = ""
+    calib['calibration_version'] = 10
     calib['cameras'] = []
     calib['cameras'].append( add_camera_calibration(K1,D1) )
     calib['cameras'].append( add_camera_calibration(K2,D2) )
