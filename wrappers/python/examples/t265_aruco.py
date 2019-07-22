@@ -245,12 +245,12 @@ def evaluate_calibration(object_points, image_points, identification, rvec, tvec
         plt.close()
 
 def add_camera_calibration(K,D):
-    cam = {}
+    cam = OrderedDict()
     cam['center_px'] = [K[0,2], K[1,2]]
     cam['focal_length_px'] = [K[0,0], K[1,1]]
-    cam['distortion'] = {}
-    cam['distortion']['type'] = 'kannalabrandt4'
+    cam['distortion'] = OrderedDict()
     cam['distortion']['k'] = D.tolist()
+    cam['distortion']['type'] = 'kannalabrandt4'
     return cam
 
 def save_calibration(directory, sn, K1, D1, K2, D2):
@@ -262,7 +262,7 @@ def save_calibration(directory, sn, K1, D1, K2, D2):
 
     if not os.path.exists(directory):
         os.mkdir(directory)
-    with open(directory + '/calibration.json', 'w') as f:
+    with open(directory + '/calibration_' + sn + '.json', 'w') as f:
         json.dump(calib, f, indent=4)
 
 def calibrate_observations(camera_name, Korig, Dorig):
@@ -335,21 +335,14 @@ def callback(frame):
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--path', default="images", help='image path')
+parser.add_argument('--path', default="cam", help='image path')
 args = parser.parse_args()
 
 try:
     pipe = rs.pipeline()
     cfg = rs.config()
-
-    # record to rosbag (all streams)
-    if not os.path.exists(args.path):
-        os.mkdir(args.path)
-    cfg.enable_record_to_file(args.path+"/raw.bag");
-
-    # Start streaming with our callback
+    cfg.enable_record_to_file("raw.bag");  # record to rosbag (all streams)
     pipe.start(cfg, callback)
-
 
     # Retreive the stream and intrinsic properties for both cameras
     profiles = pipe.get_active_profile()
@@ -357,6 +350,7 @@ try:
     dev = profiles.get_device()
     sn = dev.get_info(rs.camera_info.serial_number)
     print("Serial number:", sn)
+    args.path  = args.path + "_" + sn
 
     streams = {"left"  : profiles.get_stream(rs.stream.fisheye, 1).as_video_stream_profile(),
                "right" : profiles.get_stream(rs.stream.fisheye, 2).as_video_stream_profile()}
