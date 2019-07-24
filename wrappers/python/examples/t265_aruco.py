@@ -32,7 +32,9 @@ import json
 import argparse
 
 
+#TODO: make cmd. line arg.
 visualize = False
+validate = False  # use factory calibration as GT
 
 flags = cv2.fisheye.CALIB_FIX_SKEW | cv2.fisheye.CALIB_RECOMPUTE_EXTRINSIC
 criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 500, 1e-3)
@@ -158,11 +160,13 @@ def theta_d(theta, D):
     return theta*( 1+D[0]*np.power(theta,2)+D[1]*np.power(theta,4)+D[2]*np.power(theta,6)+D[3]*np.power(theta,8) )
 
 def evaluate_calibration(object_points, image_points, identification, rvec, tvec, K, D, Korig, Dorig):
-    #print("dfx[%]:", (K[0,0]/Korig[0,0]-1)*100 )  # to percent
-    #print("dfy[%]:", (K[1,1]/Korig[1,1]-1)*100 )  # to percent
-    #print("cx[px]:", K[0,2]/Korig[0,2])
-    #print("cy[px]:", K[1,2]/Korig[1,2])
-    # TODO: D 70, 80, 85, 90
+    if validate:
+        print("dfx[%]:", (K[0,0]/Korig[0,0]-1)*100 )  # to percent
+        print("dfy[%]:", (K[1,1]/Korig[1,1]-1)*100 )  # to percent
+        print("cx[px]:", K[0,2]/Korig[0,2])
+        print("cy[px]:", K[1,2]/Korig[1,2])
+        print("/nratio fx/fy:", K[0,0]/K[1,1] )
+        # TODO: D 70, 80, 85, 90
 
     rms = 0.0
     N = 0
@@ -191,7 +195,7 @@ def evaluate_calibration(object_points, image_points, identification, rvec, tvec
     #if visualize:
     #plt.show()
     plt.show(block=False)
-    plt.pause(3)
+    plt.pause(2)
     plt.close()
 
     # support
@@ -265,7 +269,7 @@ def save_calibration(directory, sn, K1, D1, K2, D2):
 
     if not os.path.exists(directory):
         os.mkdir(directory)
-    with open(directory + '/calibration_' + sn + '.json', 'w') as f:
+    with open(directory + '/cam' + str(sn)[-4:] + '_intrinsics.json', 'w') as f:
         json.dump(calib, f, indent=4)
 
 def calibrate_observations(camera_name, Korig, Dorig):
