@@ -171,21 +171,21 @@ int main(int c, char * v[]) try
 
         for (rs2::sensor &s : pipeline_profile.get_device().query_sensors()) {
             if (has_depth && s.supports(RS2_OPTION_EMITTER_ON_OFF)) {
-                if (!s.get_option(RS2_OPTION_EMITTER_ON_OFF))
+                if (!s.get_option(RS2_OPTION_EMITTER_ON_OFF) && !s.is_option_read_only(RS2_OPTION_EMITTER_ON_OFF))
                     s.set_option(RS2_OPTION_EMITTER_ON_OFF, 1);
             } else if (s.supports(RS2_OPTION_EMITTER_ENABLED)) {
-                if (s.get_option(RS2_OPTION_EMITTER_ENABLED))
+                if (s.get_option(RS2_OPTION_EMITTER_ENABLED) && !s.is_option_read_only(RS2_OPTION_EMITTER_ENABLED))
                     s.set_option(RS2_OPTION_EMITTER_ENABLED, 0);
             }
 
             if (s.supports(RS2_OPTION_FRAMES_QUEUE_SIZE)) {
-                if (auto size = s.get_option(RS2_OPTION_FRAMES_QUEUE_SIZE))
+                if (auto size = s.get_option(RS2_OPTION_FRAMES_QUEUE_SIZE) && !s.is_option_read_only(RS2_OPTION_FRAMES_QUEUE_SIZE))
                     s.set_option(RS2_OPTION_FRAMES_QUEUE_SIZE, 0);
             }
 
-            if (s.supports(RS2_OPTION_ENABLE_MOTION_CORRECTION))
+            if (s.supports(RS2_OPTION_ENABLE_MOTION_CORRECTION) && !s.is_option_read_only(RS2_OPTION_ENABLE_MOTION_CORRECTION))
                 s.set_option(RS2_OPTION_ENABLE_MOTION_CORRECTION, 0);
-            if (s.supports(RS2_OPTION_AUTO_EXPOSURE_PRIORITY))
+            if (s.supports(RS2_OPTION_AUTO_EXPOSURE_PRIORITY) && !s.is_option_read_only(RS2_OPTION_AUTO_EXPOSURE_PRIORITY))
                 s.set_option(RS2_OPTION_AUTO_EXPOSURE_PRIORITY, 0);
         }
     }
