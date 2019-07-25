@@ -256,6 +256,8 @@ int main(int c, char * v[]) try
                     if (!bv) bv = 1e-4f;
                 if (!in.measurement_variance_rad2__s2)
                     in.measurement_variance_rad2__s2 = 0.000005148030140844639;
+                if (s.fps() > 100)
+                    in.decimate_by = 2;
                 if (!rc_configureGyroscope(rc.get(), gyros, &ex, &in))
                     throw std::runtime_error(to_string() << "unabled to configure gyroscope " << s);
                 sensor_id[s.unique_id()] = gyros++;
