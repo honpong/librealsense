@@ -30,6 +30,7 @@ import os
 from collections import OrderedDict
 import json
 import argparse
+import sys
 
 
 #TODO: make cmd. line arg.
@@ -342,13 +343,23 @@ def callback(frame):
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--path', default="cam", help='image path')
+parser.add_argument('--path',   default="cam", help='image path')
+parser.add_argument('--record',                help='record <filename> to rosbag')
+parser.add_argument('--play',                  help='playback <filename> from rosbag')
 args = parser.parse_args()
+
+if args.record is not None and args.play is not None:
+    print("Error: Cannot specify record and play simulataneously\n")
+    parser.print_help()
+    sys.exit(1)
 
 try:
     pipe = rs.pipeline()
     cfg = rs.config()
-    cfg.enable_record_to_file("raw.bag");  # record to rosbag (all streams)
+    if args.record:
+        cfg.enable_record_to_file(args.record)  # record to rosbag (all streams)
+    elif args.play:
+        cfg.enable_device_from_file(args.play)  # playback from rosbag
     pipe.start(cfg, callback)
 
     # Retreive the stream and intrinsic properties for both cameras
@@ -382,7 +393,8 @@ try:
     (width, height) = (intrinsics["left"].width, intrinsics["left"].height)
 
     # Get thre relative extrinsics between the left and right camera
-    (R, T) = get_extrinsics(streams["right"], streams["left"])
+    if args.play is None: # can't get this from playback
+        (R, T) = get_extrinsics(streams["right"], streams["left"])
 
     mode = "stack"
 
