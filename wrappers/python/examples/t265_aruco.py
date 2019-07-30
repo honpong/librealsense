@@ -118,26 +118,6 @@ def detect_markers(frame, K, D):
     image_points = np.reshape(np.array(chess_corners), (1, -1, 2))
     return (True, object_points, image_points, chess_ids)
 
-    """
-        K_guess = np.array([[285,   0, (image_size[0]-1)/2],
-                            [  0, 285, (image_size[1]-1)/2],
-                            [  0,   0, 1]])
-        D_guess = np.zeros((4,1))
-        D_guess = np.array([-0.000624021, 0.0357663, -0.0336763, 0.00530492])
-        print(object_points.shape)
-        print(object_points.dtype)
-        object_points = np.reshape(object_points, (1, 1, -1, 3))
-        image_points = np.reshape(image_points, (1, 1, -1, 2))
-        flags = cv2.fisheye.CALIB_FIX_SKEW | cv2.fisheye.CALIB_USE_INTRINSIC_GUESS
-
-        (rms_error, camera_matrix, distortion_coeffs, rvec, tvec) = cv2.fisheye.calibrate(objectPoints = object_points,
-                                                                                        imagePoints = image_points,
-                                                                                        image_size = image_size,
-                                                                                        K = K_guess,
-                                                                                        D = D_guess,
-                                                                                        flags = flags)
-    """
-
 observations = {"left" : [], "right" : []}
 
 def add_observation(camera_name, object_points, image_points, ids):
@@ -283,12 +263,6 @@ def calibrate_observations(camera_name, Korig, Dorig):
         object_points.append(obj_i)
         image_points.append(img_i)
         identification.append(ids)
-    #op = np.concatenate(object_points, axis=1)
-    #ip = np.concatenate(image_points, axis=1)
-    #print("P{", op.shape)
-    #print(ip.shape)
-    #object_points = np.reshape(op, (1, 1, -1, 3))
-    #image_points = np.reshape(ip, (1, 1, -1, 2))
     D = np.array([-0.00626438, 0.0493399, -0.0463255, 0.00896666])
     K = np.zeros((3,3))
     image_size = (848, 800)
