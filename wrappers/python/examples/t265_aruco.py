@@ -243,7 +243,7 @@ def add_camera_calibration(K,D):
     cam['center_px'] = [K[0,2], K[1,2]]
     cam['focal_length_px'] = [K[0,0], K[1,1]]
     cam['distortion'] = OrderedDict()
-    cam['distortion']['k'] = D.tolist()
+    cam['distortion']['k'] = D.flatten().tolist()
     cam['distortion']['type'] = 'kannalabrandt4'
     return cam
 
