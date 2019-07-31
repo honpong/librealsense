@@ -52,6 +52,14 @@ parameters = cv2.aruco.DetectorParameters_create()
 #parameters.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_SUBPIX
 
 
+import errno
+def ensure_path(path):
+    try:
+        os.makedirs(path)
+    except OSError as exception:
+        if exception.errno != errno.EEXIST:
+            raise
+
 """
 Returns R, T transform from src to dst
 """
@@ -343,6 +351,7 @@ try:
     sn = dev.get_info(rs.camera_info.serial_number)
     print("Serial number:", sn)
     args.path  = args.path + "_" + sn
+    ensure_path(args.path)
 
     streams = {"left"  : profiles.get_stream(rs.stream.fisheye, 1).as_video_stream_profile(),
                "right" : profiles.get_stream(rs.stream.fisheye, 2).as_video_stream_profile()}
