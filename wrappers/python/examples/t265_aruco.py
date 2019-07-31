@@ -92,7 +92,7 @@ def detect_markers(frame, K, D):
     cv2.aruco.drawDetectedMarkers(frame_copy, markers, ids)
     cv2.imshow("detected markers", frame_copy)
     cv2.waitKey(1)
-    cv2.imwrite("1_detect_markers.png", frame_copy)
+    #cv2.imwrite("1_detect_markers.png", frame_copy)
 
     (markers, ids, rejected, _) = cv2.aruco.refineDetectedMarkers(frame, board, markers, ids, rejected, errorCorrectionRate=1, parameters=parameters)
 
@@ -100,7 +100,7 @@ def detect_markers(frame, K, D):
     cv2.aruco.drawDetectedMarkers(frame_copy2, markers, ids)
     cv2.imshow("detected markers (refined)", frame_copy2)
     cv2.waitKey(1)
-    cv2.imwrite("2_detect_markers_refined.png", frame_copy2)
+    #cv2.imwrite("2_detect_markers_refined.png", frame_copy2)
 
     ok = ids is not None and len(ids) > 15
     if ok:
@@ -110,7 +110,7 @@ def detect_markers(frame, K, D):
         cv2.aruco.drawDetectedCornersCharuco(frame_copy3, chess_corners, chess_ids)
         cv2.imshow("detected interpol. corners", frame_copy3)
         cv2.waitKey(1)
-        cv2.imwrite("3_detect_corners_interpol.png", frame_copy3)
+        #cv2.imwrite("3_detect_corners_interpol.png", frame_copy3)
 
         ok = num_refined > 15
 
