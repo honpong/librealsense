@@ -334,7 +334,7 @@ try:
         cfg.enable_record_to_file(args.record)  # record to rosbag (all streams)
     elif args.play:
         cfg.enable_device_from_file(args.play)  # playback from rosbag
-    pipe.start(cfg, callback)
+    pipe.start(cfg)
 
     # Retreive the stream and intrinsic properties for both cameras
     profiles = pipe.get_active_profile()
@@ -376,6 +376,9 @@ try:
     n_img1 = 0
     n_img2 = 0
     while True:
+        frames = pipe.wait_for_frames()
+        callback(frames)
+
         K1 = D1 = K2= D2 = None
         # Check if the camera has acquired any frames
         frame_mutex.acquire()
