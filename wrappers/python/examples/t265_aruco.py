@@ -43,12 +43,11 @@ validate = False  # use factory calibration as GT
 flags = cv2.fisheye.CALIB_FIX_SKEW | cv2.fisheye.CALIB_USE_INTRINSIC_GUESS | cv2.fisheye.CALIB_RECOMPUTE_EXTRINSIC
 criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 5000, 1e-6)
 
-factor = 1
-board_width = int(16/factor)
-board_height = int(10/factor)
-checker_size_m = 0.015*factor
-april_size_m = 0.0075*factor
-dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_1000)
+board_width = 16
+board_height = 10
+checker_size_m = 0.015
+april_size_m = 0.0075
+dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_100)  # 16*10/2 = 80
 board = cv2.aruco.CharucoBoard_create(board_width, board_height, checker_size_m, april_size_m, dictionary)
 parameters = cv2.aruco.DetectorParameters_create()
 #parameters.adaptiveThreshWinSizeStep = 2
