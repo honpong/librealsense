@@ -36,6 +36,7 @@ import sys
 #TODO: make cmd. line arg.
 visualize = False
 validate = False  # use factory calibration as GT
+N_OBS_MIN = 900
 
 # CALIB_FIX_SKEW - Fixes the skew (K[0][1]) to 0
 # CALIB_USE_INTRINSIC_GUESS - uses the K and D input as a guess
@@ -328,12 +329,6 @@ def calibrate_observations(camera_name, Korig, Dorig):
     return (rmse, K, D)
 
 
-frame_data = {"left"  : None,
-              "right" : None,
-              "timestamp_ms" : None
-              }
-
-
 parser = argparse.ArgumentParser()
 parser.add_argument('--path',   default="cam", help='image path')
 parser.add_argument('--record',                help='record <filename> to rosbag')
@@ -358,6 +353,11 @@ try:
     profiles = pipe.get_active_profile()
 
     dev = profiles.get_device()
+
+    if args.play:
+        playback = dev.as_playback()  # loop playback, check timestamp
+        playback.set_real_time(False)  # playback non-RT not to drop frames (https://intelrealsense.github.io/librealsense/doxygen/classrs2_1_1playback.html#aca02f3a4b789b150d2b7699d27a94324)
+
     sn = dev.get_info(rs.camera_info.serial_number)
     print("Serial number:", sn)
     args.path  = args.path + "_" + sn
@@ -398,27 +398,36 @@ try:
     left_computed = False
     right_computed = False
     K1 = D1 = K2= D2 = None
-    while True:
-        frames = pipe.wait_for_frames()  # blocking
-        #if frame.is_frameset():
-        frameset = frames.as_frameset()
-        f1 = frameset.get_fisheye_frame(1).as_video_frame()
-        f2 = frameset.get_fisheye_frame(2).as_video_frame()
-        left_data = np.asanyarray(f1.get_data())
-        right_data = np.asanyarray(f2.get_data())
-        ts = frameset.get_timestamp()
-        frame_copy = {"left"  : left_data,
-                      "right" : right_data}
-        z+=1
-        print(z)
+    stop = False
+    t_last = 0
+    while not stop:
+        ts = None      
+        frames = pipe.poll_for_frames()
+        if frames.is_frameset():
+            z+=1
+            #print(z)
+            frameset = frames.as_frameset()
+            f1 = frameset.get_fisheye_frame(1).as_video_frame()
+            f2 = frameset.get_fisheye_frame(2).as_video_frame()
+            left_data = np.asanyarray(f1.get_data())
+            right_data = np.asanyarray(f2.get_data())
+            ts = frameset.get_timestamp() # valid
+            frame_copy = {"left"  : left_data,
+                          "right" : right_data}
+
         if z % 20 != 0:  # subsample
             continue
 
         # Check if the camera has acquired any frames
-        valid = ts is not None
+        if ts is not None:
+            # stop automatic loop
+            if ts < t_last:
+                print("Stop.")
+                #valid = False
+                stop = True
+                continue
+            t_last = ts
 
-        # If frames are ready to process
-        if valid:
             # undistort
             #frame = frame_copy["left"]
             #cv2.imwrite("0_distorted.png", frame)
@@ -446,7 +455,7 @@ try:
                     cv2.imwrite(args.path+"/fe1_ "+str(n_img1)+".png", frame_copy["left"])
                     n_img1 = n_img1 +1
 
-                    if not left_computed and len(observations["left"]) > 20:
+                    if not left_computed and len(observations["left"]) > N_OBS_MIN:
                         (rms1, K1, D1) = calibrate_observations("left", K0l, D0l)
                         left_computed = True
 
@@ -467,7 +476,7 @@ try:
                     cv2.imwrite(args.path+"/fe2_ "+str(n_img2)+".png", frame_copy["right"])
                     n_img2 = n_img2 +1
 
-                    if not right_computed and len(observations["right"]) > 20:
+                    if not right_computed and len(observations["right"]) > N_OBS_MIN:
                         (rms2, K2, D2) = calibrate_observations("right", K0r, D0r)
                         right_computed = True
 
