@@ -327,6 +327,7 @@ def calibrate_observations(camera_name, Korig, Dorig):
 
     return (rmse, K, D)
 
+
 # Set up a mutex to share data between threads
 from threading import Lock
 frame_mutex = Lock()
@@ -334,27 +335,6 @@ frame_data = {"left"  : None,
               "right" : None,
               "timestamp_ms" : None
               }
-
-"""
-This callback is called on a separate thread, so we must use a mutex
-to ensure that data is synchronized properly. We should also be
-careful not to do much work on this thread to avoid data backing up in the
-callback queue.
-"""
-def callback(frame):
-    global frame_data
-    if frame.is_frameset():
-        frameset = frame.as_frameset()
-        f1 = frameset.get_fisheye_frame(1).as_video_frame()
-        f2 = frameset.get_fisheye_frame(2).as_video_frame()
-        left_data = np.asanyarray(f1.get_data())
-        right_data = np.asanyarray(f2.get_data())
-        ts = frameset.get_timestamp()
-        frame_mutex.acquire()
-        frame_data["left"] = left_data
-        frame_data["right"] = right_data
-        frame_data["timestamp_ms"] = ts
-        frame_mutex.release()
 
 
 parser = argparse.ArgumentParser()
@@ -422,10 +402,22 @@ try:
     right_computed = False
     K1 = D1 = K2= D2 = None
     while True:
-        frames = pipe.wait_for_frames()
-        callback(frames)
+        frames = pipe.wait_for_frames()  # blocking
+        #if frame.is_frameset():
+        frameset = frames.as_frameset()
+        f1 = frameset.get_fisheye_frame(1).as_video_frame()
+        f2 = frameset.get_fisheye_frame(2).as_video_frame()
+        left_data = np.asanyarray(f1.get_data())
+        right_data = np.asanyarray(f2.get_data())
+        ts = frameset.get_timestamp()
+        frame_mutex.acquire()
+        frame_data["left"] = left_data
+        frame_data["right"] = right_data
+        frame_data["timestamp_ms"] = ts
+        frame_mutex.release()
         z+=1
-        if z % 20 != 0:
+        print(z)
+        if z % 20 != 0:  # subsample
             continue
 
         # Check if the camera has acquired any frames
