@@ -328,9 +328,6 @@ def calibrate_observations(camera_name, Korig, Dorig):
     return (rmse, K, D)
 
 
-# Set up a mutex to share data between threads
-from threading import Lock
-frame_mutex = Lock()
 frame_data = {"left"  : None,
               "right" : None,
               "timestamp_ms" : None
@@ -410,28 +407,21 @@ try:
         left_data = np.asanyarray(f1.get_data())
         right_data = np.asanyarray(f2.get_data())
         ts = frameset.get_timestamp()
-        frame_mutex.acquire()
         frame_data["left"] = left_data
         frame_data["right"] = right_data
         frame_data["timestamp_ms"] = ts
-        frame_mutex.release()
         z+=1
         print(z)
         if z % 20 != 0:  # subsample
             continue
 
         # Check if the camera has acquired any frames
-        frame_mutex.acquire()
         valid = frame_data["timestamp_ms"] is not None
-        frame_mutex.release()
 
         # If frames are ready to process
         if valid:
-            # Hold the mutex only long enough to copy the stereo frames
-            frame_mutex.acquire()
             frame_copy = {"left"  : frame_data["left"].copy(),
                           "right" : frame_data["right"].copy()}
-            frame_mutex.release()
 
             # undistort
             #frame = frame_copy["left"]
