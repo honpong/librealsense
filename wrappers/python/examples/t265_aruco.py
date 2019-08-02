@@ -93,16 +93,18 @@ def detect_markers(frame, K, D):
 
     frame_copy = frame.copy()
     cv2.aruco.drawDetectedMarkers(frame_copy, markers, ids)
-    cv2.imshow("detected markers", frame_copy)
-    cv2.waitKey(1)
+    if visualize:
+        cv2.imshow("detected markers", frame_copy)
+        cv2.waitKey(1)
     #cv2.imwrite("1_detect_markers.png", frame_copy)
 
     (markers, ids, rejected, _) = cv2.aruco.refineDetectedMarkers(frame, board, markers, ids, rejected, errorCorrectionRate=1, parameters=parameters)
 
     frame_copy2 = frame.copy()
     cv2.aruco.drawDetectedMarkers(frame_copy2, markers, ids)
-    cv2.imshow("detected markers (refined)", frame_copy2)
-    cv2.waitKey(1)
+    if visualize:
+        cv2.imshow("detected markers (refined)", frame_copy2)
+        cv2.waitKey(1)
     #cv2.imwrite("2_detect_markers_refined.png", frame_copy2)
 
     ok = ids is not None and len(ids) > 15
@@ -111,8 +113,9 @@ def detect_markers(frame, K, D):
 
         frame_copy3 = frame.copy()
         cv2.aruco.drawDetectedCornersCharuco(frame_copy3, chess_corners, chess_ids)
-        cv2.imshow("detected interpol. corners", frame_copy3)
-        cv2.waitKey(1)
+        if visualize:
+            cv2.imshow("detected interpol. corners", frame_copy3)
+            cv2.waitKey(1)
         #cv2.imwrite("3_detect_corners_interpol.png", frame_copy3)
 
         ok = num_refined > 15
@@ -197,11 +200,11 @@ def evaluate_calibration(object_points, image_points, identification, rvec, tvec
     #print("rms:", rms)
 
     plt.savefig("reproj_err.png")
-    #if visualize:
-    #plt.show()
-    plt.show(block=False)
-    plt.pause(2)
-    plt.close()
+    if visualize:
+        #plt.show()
+        plt.show(block=False)
+        plt.pause(2)
+        plt.close()
 
     # support
 
@@ -231,27 +234,6 @@ def evaluate_calibration(object_points, image_points, identification, rvec, tvec
         plt.pause(3)
         plt.close()
 
-    if visualize:
-        plt.figure()
-        plt.xlabel('deg')
-
-        plt.plot(theta, theta_d(theta, D)/theta-1)
-        #plt.plot(theta, theta_d(theta, Dmean)/theta-1, '--')
-        #plt.plot(theta, theta_d(theta, Dorig)/theta-1)
-        #plt.plot(theta, theta_d(theta, D)/theta - theta_d(theta, Dmean)/theta)
-        #plt.plot(theta, theta_d(theta, D)/theta - theta_d(theta, Dorig)/theta)
-
-        plt.plot([0,m.pi/2],[0,0],'k--')
-        plt.plot([0,m.pi/2],[0.01,0.01],'b--')
-        plt.plot([0,m.pi/2],[-0.01,-0.01],'b--')
-
-        plt.legend(['new','mean','orig', 'delta_mean', 'delta_orig', '1%'])
-
-        plt.savefig("distortion.png")
-        #plt.show()
-        plt.show(block=False)
-        plt.pause(3)
-        plt.close()
     return (inlier_object_points, inlier_image_points)
 
 def add_camera_calibration(K,D):
@@ -371,8 +353,9 @@ try:
     measured = 0
 
     # Set up an OpenCV window to visualize the results
-    WINDOW_TITLE = 'Realsense'
-    cv2.namedWindow(WINDOW_TITLE, cv2.WINDOW_AUTOSIZE)
+    if visualize:
+        WINDOW_TITLE = 'Realsense'
+        cv2.namedWindow(WINDOW_TITLE, cv2.WINDOW_AUTOSIZE)
 
     # Print information about both cameras
     #print("Left camera:",  intrinsics["left"])
@@ -422,8 +405,7 @@ try:
         if ts is not None:
             # stop automatic loop
             if ts < t_last:
-                print("Stop.")
-                #valid = False
+                print("End of bag.")
                 stop = True
                 continue
             t_last = ts
@@ -489,18 +471,18 @@ try:
                 f.close()
                 sys.exit(0)
 
-            #color_image0 = cv2.cvtColor(frame_copy["left"], cv2.COLOR_GRAY2RGB)
-            #cv2.imshow(WINDOW_TITLE,color_image0)
-
-        key = cv2.waitKey(1)
-        if key == ord('i'): mode = "ids"
-        if key == ord('o'): mode = "overlay"
-        if key == ord('r'): mode = "r"
-        if key == ord('p'): mode = "p"
-        if key == ord('s'):
-            cv2.imwrite("left.pgm", frame_copy["left"])
-            cv2.imwrite("right.pgm", frame_copy["right"])
-        if key == ord('q') or cv2.getWindowProperty(WINDOW_TITLE, cv2.WND_PROP_VISIBLE) < 1:
-            break
+        if visualize:
+            key = cv2.waitKey(1)
+            if key == ord('i'): mode = "ids"
+            if key == ord('o'): mode = "overlay"
+            if key == ord('r'): mode = "r"
+            if key == ord('p'): mode = "p"
+            if key == ord('s'):
+                cv2.imwrite("left.pgm", frame_copy["left"])
+                cv2.imwrite("right.pgm", frame_copy["right"])
+            if key == ord('q') or cv2.getWindowProperty(WINDOW_TITLE, cv2.WND_PROP_VISIBLE) < 1:
+                break
 finally:
+    #d(rms2, K2, D2) = calibrate_observations("right", K0r, D0r)
+    #cv2.destroyAllWindows()
     pipe.stop()
