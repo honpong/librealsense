@@ -407,22 +407,18 @@ try:
         left_data = np.asanyarray(f1.get_data())
         right_data = np.asanyarray(f2.get_data())
         ts = frameset.get_timestamp()
-        frame_data["left"] = left_data
-        frame_data["right"] = right_data
-        frame_data["timestamp_ms"] = ts
+        frame_copy = {"left"  : left_data,
+                      "right" : right_data}
         z+=1
         print(z)
         if z % 20 != 0:  # subsample
             continue
 
         # Check if the camera has acquired any frames
-        valid = frame_data["timestamp_ms"] is not None
+        valid = ts is not None
 
         # If frames are ready to process
         if valid:
-            frame_copy = {"left"  : frame_data["left"].copy(),
-                          "right" : frame_data["right"].copy()}
-
             # undistort
             #frame = frame_copy["left"]
             #cv2.imwrite("0_distorted.png", frame)
