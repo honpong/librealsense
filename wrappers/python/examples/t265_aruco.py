@@ -36,7 +36,7 @@ import sys
 #TODO: make cmd. line arg.
 visualize = False
 validate = False  # use factory calibration as GT
-N_OBS_MIN = 900
+N_OBS_MIN = 30
 
 # CALIB_FIX_SKEW - Fixes the skew (K[0][1]) to 0
 # CALIB_USE_INTRINSIC_GUESS - uses the K and D input as a guess
@@ -312,7 +312,7 @@ def calibrate_observations(camera_name, Korig, Dorig):
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--path',   default="cam", help='image path')
+parser.add_argument('--path',   default="cam", help='output path prefix')
 parser.add_argument('--record',                help='record <filename> to rosbag')
 parser.add_argument('--play',                  help='playback <filename> from rosbag')
 args = parser.parse_args()
@@ -434,10 +434,10 @@ try:
                     add_observation("left", object_points, image_points, chess_ids)
                     print("good left image")
 
-                    cv2.imwrite(args.path+"/fe1_ "+str(n_img1)+".png", frame_copy["left"])
+                    cv2.imwrite(args.path + "/fe1_ "+str(n_img1)+".png", frame_copy["left"])
                     n_img1 = n_img1 +1
 
-                    if not left_computed and len(observations["left"]) > N_OBS_MIN:
+                    if not left_computed and len(observations["left"]) >= N_OBS_MIN:
                         (rms1, K1, D1) = calibrate_observations("left", K0l, D0l)
                         left_computed = True
 
@@ -455,10 +455,10 @@ try:
                     add_observation("right", object_points, image_points, chess_ids)
                     print("good right image")
 
-                    cv2.imwrite(args.path+"/fe2_ "+str(n_img2)+".png", frame_copy["right"])
+                    cv2.imwrite(args.path + "/fe2_ "+str(n_img2)+".png", frame_copy["right"])
                     n_img2 = n_img2 +1
 
-                    if not right_computed and len(observations["right"]) > N_OBS_MIN:
+                    if not right_computed and len(observations["right"]) >= N_OBS_MIN:
                         (rms2, K2, D2) = calibrate_observations("right", K0r, D0r)
                         right_computed = True
 
@@ -469,7 +469,6 @@ try:
                 f = open(args.path + '/rmse.txt','a')
                 np.savetxt(f, np.array([rms1, rms2]).reshape(1,2))
                 f.close()
-                sys.exit(0)
 
         if visualize:
             key = cv2.waitKey(1)
