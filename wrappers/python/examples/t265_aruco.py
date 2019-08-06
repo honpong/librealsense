@@ -273,6 +273,19 @@ def save_calibration(directory, sn, K1, D1, K2, D2):
     with open(directory + '/cam' + str(sn)[-4:] + '_intrinsics.json', 'w') as f:
         json.dump(calib, f, indent=4)
 
+import csv
+def save_observations(camera_name, filename):
+    obs = observations[camera_name]
+    with open(filename, "w") as f:
+        o = csv.writer(f)
+        o.writerow(["image_number", "id", "obj_x", "obj_y", "obj_z", "img_x", "img_y"])
+        for i in range(len(obs)):
+            (id_to_image_pt, obj_i, img_i, ids) = obs[i]
+            print("shape", ids.shape, obj_i.shape, img_i.shape)
+            for j in range(ids.shape[0]):
+                print(i, j, ids[j][0], obj_i[0][j], img_i[0][j])
+                o.writerow([i, ids[j][0], obj_i[0][j][0], obj_i[0][j][1], obj_i[0][j][2], img_i[0][j][0], img_i[0][j][1]])
+
 def calibrate_observations(camera_name, Korig, Dorig):
     obs = observations[camera_name]
     object_points = []
@@ -428,6 +441,8 @@ try:
     print("Calibrating", nobservations)
     (rms1, K1, D1) = calibrate_observations("left", K0l, D0l)
     (rms2, K2, D2) = calibrate_observations("right", K0r, D0r)
+    save_observations("left", "left.csv")
+    save_observations("right", "right.csv")
 
     save_calibration('cals', sn, K1, D1, K2, D2)
 
