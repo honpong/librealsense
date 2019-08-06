@@ -90,6 +90,66 @@ def visualize_markers(frame, markers, ids):
     cv2.aruco.drawDetectedMarkers(frame_copy, markers, ids)
     return frame_copy
 
+
+dets = 0
+def detect_markers_aruco_corner(frame, K, D):
+    parameters.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_SUBPIX
+    parameters.cornerRefinementWinSize = 1
+    parameters.minCornerDistanceRate = 0.2
+
+    (markers, ids, rejected) = cv2.aruco.detectMarkers(frame, dictionary, parameters=parameters)
+
+    global dets
+    dets += 1
+    if visualize:
+        detections = visualize_markers(frame, markers, ids)
+        cv2.imshow("detected markers", detections)
+        cv2.waitKey(1)
+        cv2.imwrite("tmp/%03d_1_detect_markers.png" % dets, detections)
+
+    (markers, ids, rejected, _) = cv2.aruco.refineDetectedMarkers(frame, board, markers, ids, rejected, errorCorrectionRate=0, parameters=parameters)
+
+    if visualize:
+        detections = visualize_markers(frame, markers, ids)
+        cv2.imshow("detected markers (refined)", detections)
+        cv2.waitKey(1)
+        cv2.imwrite("tmp/%03d_2_detect_markers_refined.png" % dets, detections)
+
+    ok = ids is not None and len(ids) > min_detections
+    if not ok:
+        return (False, None, None, None)
+
+    image_points = []
+    object_points = []
+    inlier_ids = []
+    for i in range(len(ids)):
+        id1 = ids[i][0]
+        ul = markers[i][0][0]
+        #print(markers[i][0][0])
+        row = m.floor(id1 / (board_width/2)) # only 8 tags per row in a board 16 wide
+        col = id1 % (board_width/2)
+        if row >= board_height: # 80 total tags, 8 x 10 high
+            print("Got a bad id", id1)
+            continue # bad id
+        odd_offset = row % 2 == 1
+        row = (board_height-1) - row # switches origin to bottom left
+        x = col * 2 * checker_size_m # ignores offset from corner to corner of apriltag (global offset)
+        y = row * checker_size_m
+        if odd_offset:
+            x += checker_size_m
+        object_point = (x, y, 0)
+        image_points.append(ul)
+        object_points.append([x, y, 0])
+        inlier_ids.append([id1])
+        #print("id", id1, "row", row, "col", col, "object", x, y, 0, "image", ul)
+        # it seems like object y may be inverted from what I expect
+
+
+    chess_ids = np.array(inlier_ids)
+    object_points = np.reshape(np.array(object_points), (1, -1, 3))
+    image_points = np.reshape(np.array(image_points), (1, -1, 2))
+    return (True, object_points, image_points, chess_ids)
+
 def detect_markers(frame, K, D):
     (markers, ids, rejected) = cv2.aruco.detectMarkers(frame, dictionary, parameters=parameters)
 
