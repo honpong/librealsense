@@ -33,7 +33,7 @@ import argparse
 import sys
 
 visualize = False
-validate = False  # use factory calibration as GT
+validate = True  # use factory calibration as GT
 
 # CALIB_FIX_SKEW - Fixes the skew (K[0][1]) to 0
 # CALIB_USE_INTRINSIC_GUESS - uses the K and D input as a guess
@@ -229,7 +229,6 @@ def evaluate_calibration(object_points, image_points, identification, rvec, tvec
         print("dfy[%]:", (K[1,1]/Korig[1,1]-1)*100 )  # to percent
         print("cx[px]:", K[0,2]/Korig[0,2])
         print("cy[px]:", K[1,2]/Korig[1,2])
-        print("/nratio fx/fy:", K[0,0]/K[1,1] )
         # TODO: D 70, 80, 85, 90
 
     plot_scatter = False
@@ -254,7 +253,7 @@ def evaluate_calibration(object_points, image_points, identification, rvec, tvec
             proj_err = image_points[i][0][j] - proj[0][0][j]
             #print(proj_err)
 
-            if plot_scatter:
+            if plot_scatter and identification:
                 plt.text(proj_err[0], proj_err[1], str(i)+","+str(identification[i][j][0]))
 
             pt_rms = np.array(proj_err).dot(proj_err)
@@ -341,9 +340,9 @@ def save_observations(camera_name, filename):
         o.writerow(["image_number", "id", "obj_x", "obj_y", "obj_z", "img_x", "img_y"])
         for i in range(len(obs)):
             (id_to_image_pt, obj_i, img_i, ids) = obs[i]
-            print("shape", ids.shape, obj_i.shape, img_i.shape)
+            #print("shape", ids.shape, obj_i.shape, img_i.shape)
             for j in range(ids.shape[0]):
-                print(i, j, ids[j][0], obj_i[0][j], img_i[0][j])
+                #print(i, j, ids[j][0], obj_i[0][j], img_i[0][j])
                 o.writerow([i, ids[j][0], obj_i[0][j][0], obj_i[0][j][1], obj_i[0][j][2], img_i[0][j][0], img_i[0][j][1]])
 
 def calibrate_observations(camera_name, Korig, Dorig):
@@ -394,6 +393,8 @@ def calibrate_observations(camera_name, Korig, Dorig):
     print("refined rmse", rmse)
     print("camera", K)
     print("distortion_coeffs", np.array2string(D, separator=', '))
+
+    evaluate_calibration(inlier_object, inlier_image, None, rvec, tvec, K, Dguess, Korig, Dorig, rmse*3)
 
     return (rmse, K, D)
 
@@ -500,6 +501,7 @@ try:
     print("Finished replay")
     print("Calibrating", nobservations)
     (rms1, K1, D1) = calibrate_observations("left", K0l, D0l)
+    print()
     (rms2, K2, D2) = calibrate_observations("right", K0r, D0r)
     save_observations("left", "left.csv")
     save_observations("right", "right.csv")
