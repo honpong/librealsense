@@ -260,7 +260,7 @@ def save_observations(camera_name, filename):
                 #print(i, j, ids[j][0], obj_i[0][j], img_i[0][j])
                 o.writerow([i, ids[j][0], obj_i[0][j][0], obj_i[0][j][1], obj_i[0][j][2], img_i[0][j][0], img_i[0][j][1]])
 
-def evaluate_calibration(object_points, image_points, identification, rvec, tvec, K, D, Korig, Dorig, pixel_thresh):
+def evaluate_calibration(camera_name, object_points, image_points, identification, rvec, tvec, K, D, Korig, Dorig, pixel_thresh = None):
     if validate:
         print("dfx[%]:", (K[0,0]/Korig[0,0]-1)*100 )  # to percent
         print("dfy[%]:", (K[1,1]/Korig[1,1]-1)*100 )  # to percent
@@ -279,7 +279,7 @@ def evaluate_calibration(object_points, image_points, identification, rvec, tvec
         proj = cv2.fisheye.projectPoints(object_points[i], rvec[i], tvec[i], K, D)
         proj_err = image_points[i][0] - proj[0][0]
         if plot_scatter:
-            plt.scatter(proj_err[:,0], proj_err[:,1])
+            plt.scatter(proj_err[:,0], proj_err[:,1], marker='.')
 
         Npoints = len(image_points[i][0])  # number of points
         inlier_object = []
@@ -295,11 +295,12 @@ def evaluate_calibration(object_points, image_points, identification, rvec, tvec
             if d > d_max:
                 d_max = d
 
-            if plot_scatter and identification:
-                plt.text(proj_err[0], proj_err[1], str(i)+","+str(identification[i][j][0]))
+            if plot_scatter and identification and pixel_thresh:
+                if np.linalg.norm(proj_err) > pixel_thresh:
+                    plt.text(proj_err[0], proj_err[1], str(i)+","+str(identification[i][j][0]))
 
             pt_rms = np.array(proj_err).dot(proj_err)
-            if pt_rms < pixel_thresh:
+            if pixel_thresh and pt_rms < pixel_thresh:
                 inlier_object.append(object_points[i][0][j])
                 inlier_image.append(image_points[i][0][j])
             rms = rms + np.array(proj_err).dot(proj_err)
@@ -313,7 +314,10 @@ def evaluate_calibration(object_points, image_points, identification, rvec, tvec
     #print("rms:", rms)
 
     if plot_scatter:
-        plt.savefig("reproj_err.png")
+        if pixel_thresh:
+            plt.savefig("reproj_err_outlier_" + camera_name + ".png")
+        else:
+            plt.savefig("reproj_err_" + camera_name + ".png")
         #if visualize:
         #plt.show()
         plt.show(block=False)
@@ -373,7 +377,7 @@ def calibrate_observations(camera_name, Korig, Dorig):
     #print("tvec", tvec)
 
 
-    (inlier_object, inlier_image) = evaluate_calibration(object_points, image_points, identification, rvec, tvec, K, Dguess, Korig, Dorig, rmse*3) # 2 pixel
+    (inlier_object, inlier_image) = evaluate_calibration(camera_name, object_points, image_points, identification, rvec, tvec, K, Dguess, Korig, Dorig, rmse*3) # 2 pixel
     # object points is a python list of M items which are each (1, N, 3) np.arrays
     # image points is a python list of M items which are each (1, N, 2) np.arrays
     print(len(inlier_image), "images remaining")
@@ -389,7 +393,7 @@ def calibrate_observations(camera_name, Korig, Dorig):
     print("camera", K)
     print("distortion_coeffs", np.array2string(D, separator=', '))
 
-    evaluate_calibration(inlier_object, inlier_image, None, rvec, tvec, K, Dguess, Korig, Dorig, rmse*3)
+    evaluate_calibration(camera_name, inlier_object, inlier_image, None, rvec, tvec, K, Dguess, Korig, Dorig)
 
     return (rmse, K, D)
 
