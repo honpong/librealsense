@@ -223,91 +223,6 @@ def min_dist_for_id(camera_name, feature_id, image_point):
 def theta_d(theta, D):
     return theta*( 1+D[0]*np.power(theta,2)+D[1]*np.power(theta,4)+D[2]*np.power(theta,6)+D[3]*np.power(theta,8) )
 
-def evaluate_calibration(object_points, image_points, identification, rvec, tvec, K, D, Korig, Dorig, pixel_thresh):
-    if validate:
-        print("dfx[%]:", (K[0,0]/Korig[0,0]-1)*100 )  # to percent
-        print("dfy[%]:", (K[1,1]/Korig[1,1]-1)*100 )  # to percent
-        print("cx[px]:", K[0,2]/Korig[0,2])
-        print("cy[px]:", K[1,2]/Korig[1,2])
-        # TODO: D 70, 80, 85, 90
-
-    plot_scatter = False
-    rms = 0.0
-    N = 0
-    Nframes = len(object_points)  # number of frames
-    inlier_object_points = []
-    inlier_image_points = []
-    for i in range(Nframes):
-        proj = cv2.fisheye.projectPoints(object_points[i], rvec[i], tvec[i], K, D)
-        proj_err = image_points[i][0] - proj[0][0]
-        if plot_scatter:
-            plt.scatter(proj_err[:,0], proj_err[:,1])
-
-        Npoints = len(image_points[i][0])  # number of points
-        inlier_object = []
-        inlier_image = []
-        for j in range(Npoints):
-            #print(j)
-            #print(image_points[i][0][j])
-            #print(proj[i][0][j])
-            proj_err = image_points[i][0][j] - proj[0][0][j]
-            #print(proj_err)
-
-            if plot_scatter and identification:
-                plt.text(proj_err[0], proj_err[1], str(i)+","+str(identification[i][j][0]))
-
-            pt_rms = np.array(proj_err).dot(proj_err)
-            if pt_rms < pixel_thresh:
-                inlier_object.append(object_points[i][0][j])
-                inlier_image.append(image_points[i][0][j])
-            rms = rms + np.array(proj_err).dot(proj_err)
-        if len(inlier_object) > 5:
-            inlier_object = np.reshape(np.array(inlier_object), (1, -1, 3))
-            inlier_image  = np.reshape(np.array(inlier_image), (1, -1, 2))
-            inlier_object_points.append(inlier_object)
-            inlier_image_points.append(inlier_image)
-        N = N + Npoints
-    rms = m.sqrt(rms/N)
-    #print("rms:", rms)
-
-    if plot_scatter:
-        plt.savefig("reproj_err.png")
-        #if visualize:
-        #plt.show()
-        plt.show(block=False)
-        plt.pause(2)
-        plt.close()
-
-    # support
-
-    # distortion
-    if visualize:
-        theta = np.linspace(0,m.pi/2)
-
-        Dmean = np.array([-0.00626438, 0.0493399, -0.0463255, 0.00896666])
-        Dorig = [-0.00217445590533316,  	0.0376055203378201,  	-0.0364043116569519,  0.00593686196953058]  # TODO: read
-
-        plt.figure()
-        plt.xlabel('deg')
-
-        plt.plot(theta, theta_d(theta, D))
-        #plt.plot(theta, theta_d(theta, Dmean), '--')
-        #plt.plot(theta, theta_d(theta, Dorig))
-
-        #plt.plot(theta/m.pi*180, theta_d(theta, D)/theta - theta_d(theta, Dmean)/theta)
-
-        #plt.plot([0,90],[0,0],'k--')
-        #plt.plot([0,90],[-0.01,-0.01],'--')
-
-        plt.legend(['new','mean','orig'])
-        plt.savefig("theta_d.png")
-        #plt.show()
-        plt.show(block=False)
-        plt.pause(3)
-        plt.close()
-
-    return (inlier_object_points, inlier_image_points)
-
 def add_camera_calibration(K,D):
     cam = OrderedDict()
     cam['size_px'] = [848, 800]  # TODO: read
@@ -344,6 +259,86 @@ def save_observations(camera_name, filename):
             for j in range(ids.shape[0]):
                 #print(i, j, ids[j][0], obj_i[0][j], img_i[0][j])
                 o.writerow([i, ids[j][0], obj_i[0][j][0], obj_i[0][j][1], obj_i[0][j][2], img_i[0][j][0], img_i[0][j][1]])
+
+def evaluate_calibration(object_points, image_points, identification, rvec, tvec, K, D, Korig, Dorig, pixel_thresh):
+    if validate:
+        print("dfx[%]:", (K[0,0]/Korig[0,0]-1)*100 )  # to percent
+        print("dfy[%]:", (K[1,1]/Korig[1,1]-1)*100 )  # to percent
+        print("cx[px]:", K[0,2]/Korig[0,2])
+        print("cy[px]:", K[1,2]/Korig[1,2])
+        # TODO: D 70, 80, 85, 90
+
+    plot_scatter = False
+    rms = 0.0
+    N = 0
+    Nframes = len(object_points)  # number of frames
+    inlier_object_points = []
+    inlier_image_points = []
+    d_max = 0
+    for i in range(Nframes):
+        proj = cv2.fisheye.projectPoints(object_points[i], rvec[i], tvec[i], K, D)
+        proj_err = image_points[i][0] - proj[0][0]
+        if plot_scatter:
+            plt.scatter(proj_err[:,0], proj_err[:,1])
+
+        Npoints = len(image_points[i][0])  # number of points
+        inlier_object = []
+        inlier_image = []
+        for j in range(Npoints):
+            #print(j)
+            #print(image_points[i][0][j])
+            #print(proj[i][0][j])
+            proj_err = image_points[i][0][j] - proj[0][0][j]
+            #print(proj_err)
+
+            d = np.linalg.norm(image_points[i][0][j]-K[:2,2])
+            if d > d_max:
+                d_max = d
+
+            if plot_scatter and identification:
+                plt.text(proj_err[0], proj_err[1], str(i)+","+str(identification[i][j][0]))
+
+            pt_rms = np.array(proj_err).dot(proj_err)
+            if pt_rms < pixel_thresh:
+                inlier_object.append(object_points[i][0][j])
+                inlier_image.append(image_points[i][0][j])
+            rms = rms + np.array(proj_err).dot(proj_err)
+        if len(inlier_object) > 5:
+            inlier_object = np.reshape(np.array(inlier_object), (1, -1, 3))
+            inlier_image  = np.reshape(np.array(inlier_image), (1, -1, 2))
+            inlier_object_points.append(inlier_object)
+            inlier_image_points.append(inlier_image)
+        N = N + Npoints
+    rms = m.sqrt(rms/N)
+    #print("rms:", rms)
+
+    if plot_scatter:
+        plt.savefig("reproj_err.png")
+        #if visualize:
+        #plt.show()
+        plt.show(block=False)
+        plt.pause(2)
+        plt.close()
+
+    # support
+    print("max. distance [px]:", d_max)
+
+    # distortion
+    if visualize:
+        theta = np.linspace(0,m.pi/2)
+        Dmean = np.array([-0.00626438, 0.0493399, -0.0463255, 0.00896666])
+        Dorig = [-0.00217445590533316,      0.0376055203378201,     -0.0364043116569519,  0.00593686196953058]  # TODO: read
+        plt.figure()
+        plt.xlabel('deg')
+        plt.plot(theta, theta_d(theta, D))
+        plt.legend(['new','mean','orig'])
+        plt.savefig("theta_d.png")
+        #plt.show()
+        plt.show(block=False)
+        plt.pause(3)
+        plt.close()
+
+    return (inlier_object_points, inlier_image_points)
 
 def calibrate_observations(camera_name, Korig, Dorig):
     obs = observations[camera_name]
