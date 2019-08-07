@@ -38,7 +38,7 @@ validate = True  # use factory calibration as GT
 # CALIB_FIX_SKEW - Fixes the skew (K[0][1]) to 0
 # CALIB_USE_INTRINSIC_GUESS - uses the K and D input as a guess
 # CALIB_RECOMPUTE_EXTRINSICS - Recomputing the pose of the target every iteration, if we don't do this it only computes it once (at the start)
-flags = cv2.fisheye.CALIB_FIX_SKEW | cv2.fisheye.CALIB_USE_INTRINSIC_GUESS | cv2.fisheye.CALIB_RECOMPUTE_EXTRINSIC
+flags = cv2.fisheye.CALIB_FIX_SKEW | cv2.fisheye.CALIB_USE_INTRINSIC_GUESS | cv2.fisheye.CALIB_RECOMPUTE_EXTRINSIC | cv2.fisheye.CALIB_FIX_PRINCIPAL_POINT
 criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 5000, 1e-9)
 
 board_width = 16
@@ -264,8 +264,8 @@ def evaluate_calibration(camera_name, object_points, image_points, identificatio
     if validate:
         print("dfx[%]:", (K[0,0]/Korig[0,0]-1)*100 )  # to percent
         print("dfy[%]:", (K[1,1]/Korig[1,1]-1)*100 )  # to percent
-        print("cx[px]:", K[0,2]/Korig[0,2])
-        print("cy[px]:", K[1,2]/Korig[1,2])
+        print("cx[px]:", K[0,2]-Korig[0,2])
+        print("cy[px]:", K[1,2]-Korig[1,2])
         # TODO: D 70, 80, 85, 90
 
     plot_scatter = False
@@ -359,8 +359,10 @@ def calibrate_observations(camera_name, Korig, Dorig):
     image_size = (848, 800)
     Kguess = np.zeros((3,3))
     Kguess[0][0] = Kguess[1][1] = 285
-    Kguess[0][2] = image_size[0]/2
-    Kguess[1][2] = image_size[1]/2
+    #Kguess[0][2] = image_size[0]/2
+    #Kguess[1][2] = image_size[1]/2
+    Kguess[0][2] = Korig[0,2]
+    Kguess[1][2] = Korig[1,2]
 
     initial_flags = flags
     (rmse, K, D, rvec, tvec) = cv2.fisheye.calibrate(objectPoints = object_points,
