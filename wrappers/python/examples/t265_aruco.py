@@ -344,6 +344,15 @@ def evaluate_calibration(camera_name, object_points, image_points, identificatio
 
     return (inlier_object_points, inlier_image_points)
 
+def save_poses(filename, rvec, tvec):
+    with open(filename, "w") as f:
+        o = csv.writer(f)
+        o.writerow(["frame_number", "t_x [m]", "t_y [m]", "t_z [m]", "r_x [rad]", "r_y [rad]", "r_z [rad]"])
+        for i in range(len(tvec)):
+            t = tvec[i]  # matrix
+            r = rvec[i]
+            o.writerow([ i, t[0,0], t[1,0], t[2,0], r[0,0], r[1,0], r[2,0] ])
+
 def calibrate_observations(camera_name, Korig, Dorig):
     obs = observations[camera_name]
     object_points = []
@@ -394,6 +403,8 @@ def calibrate_observations(camera_name, Korig, Dorig):
     print("refined rmse", rmse)
     print("camera", K)
     print("distortion_coeffs", np.array2string(D, separator=', '))
+
+    save_poses(args.path + '/poses_' + camera_name + ".txt", rvec, tvec)
 
     evaluate_calibration(camera_name, inlier_object, inlier_image, None, rvec, tvec, K, Dguess, Korig, Dorig)
 
