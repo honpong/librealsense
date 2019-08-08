@@ -24,6 +24,7 @@ $ python3 t265_aruco.py        # Run the example
 import pyrealsense2 as rs
 import cv2
 import numpy as np
+np.set_printoptions(precision=6, suppress=True)
 import math as m
 import matplotlib.pyplot as plt
 import os
@@ -91,7 +92,7 @@ def visualize_markers(frame, markers, ids):
     return frame_copy
 
 
-dets = 0
+dets = -1
 def detect_markers_aruco_corner(frame, K, D):
     parameters.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_SUBPIX
     parameters.cornerRefinementWinSize = 1
@@ -150,14 +151,15 @@ def detect_markers_aruco_corner(frame, K, D):
     image_points = np.reshape(np.array(image_points), (1, -1, 2))
     return (True, object_points, image_points, chess_ids)
 
-def detect_markers(frame, K, D):
+def detect_markers(camera_name, frame, K, D):
     (markers, ids, rejected) = cv2.aruco.detectMarkers(frame, dictionary, parameters=parameters)
 
+    global nobservations
     if visualize:
         detections = visualize_markers(frame, markers, ids)
         cv2.imshow("detected markers", detections)
         cv2.waitKey(1)
-        #cv2.imwrite("1_detect_markers.png", detections)
+        cv2.imwrite(args.path + "/" + camera_name + "_%03d_1_detect_markers.png" % nobservations, detections)
 
     (markers, ids, rejected, _) = cv2.aruco.refineDetectedMarkers(frame, board, markers, ids, rejected, errorCorrectionRate=0, parameters=parameters)
 
@@ -165,7 +167,7 @@ def detect_markers(frame, K, D):
         detections = visualize_markers(frame, markers, ids)
         cv2.imshow("detected markers (refined)", detections)
         cv2.waitKey(1)
-        #cv2.imwrite("2_detect_markers_refined.png", detections)
+        cv2.imwrite(args.path + "/" + camera_name + "_%03d_2_detect_markers_refined.png" % nobservations, detections)
 
 
     ok = ids is not None and len(ids) > min_detections
@@ -175,14 +177,14 @@ def detect_markers(frame, K, D):
     if ok:
         (num_refined, chess_corners, chess_ids) = cv2.aruco.interpolateCornersCharuco(markers, ids, frame, board, minMarkers=2) #, cameraMatrix=K) #, distCoeffs=D)
 
-        frame_copy3 = frame.copy()
-        cv2.aruco.drawDetectedCornersCharuco(frame_copy3, chess_corners, chess_ids)
+        frame_copy = frame.copy()
+        cv2.aruco.drawDetectedCornersCharuco(frame_copy, chess_corners, chess_ids)
         if visualize:
-            cv2.imshow("detected interpol. corners", frame_copy3)
+            cv2.imshow("detected interpol. corners", frame_copy)
             cv2.waitKey(1)
-            #cv2.imwrite("3_detect_corners_interpol.png", frame_copy3)
+            cv2.imwrite(args.path + "/" + camera_name + "_%03d_3_detect_corners_interpol.png" % nobservations, frame_copy)
 
-        ok = num_refined > 15
+        ok = num_refined > min_detections
 
     if not ok:
         return (False, None, None, None)
@@ -410,11 +412,83 @@ def calibrate_observations(camera_name, Korig, Dorig):
 
     return (rmse, K, D)
 
+def calibrate_extrinsics(observations, K1, K2):
+    # https://docs.opencv.org/trunk/db/d58/group__calib3d__fisheye.html#gadbb3a6ca6429528ef302c784df47949b
+    obs_l = observations["left"]
+    obs_r = observations["right"]
+
+    object_points = []
+    image_points_l = []
+    image_points_r = []
+    N = len(obs_l)
+    for i in range(N):
+        print("Frame #", i)
+        (id_to_image_pt_l, obj_i_l, img_i_l, ids_l) = obs_l[i]
+        (id_to_image_pt_r, obj_i_r, img_i_r, ids_r) = obs_r[i]
+
+        obj_i = []
+        img_i_lr = []
+        img_i_rl = []
+        for j in range(len(ids_l)): # points (left)
+            if ids_l[j] in ids_r:
+                obj_i.append(obj_i_l[0,j,:])
+                img_i_lr.append(img_i_l[0,j,:])
+                img_i_rl.append(id_to_image_pt_r[ids_l[j,0]])
+
+                #print("ID #", ids_l[j,0], "found in both images")
+                #print("p3D:", obj_i_l[0,j,:])
+                #print("p2D (img1):", img_i_l[0,j,:])
+                #print("p2D (img2):",id_to_image_pt_r[ids_l[j,0]])
+                #print("delta:", img_i_l[0,j,:]-id_to_image_pt_r[ids_l[j,0]])
+
+        print("detections:", len(obj_i))
+
+        object_points.append(obj_i[:min_detections])  # ToDo: use min. of union over all frames (then possibly improve)
+        image_points_l.append(img_i_lr[:min_detections])
+        image_points_r.append(img_i_rl[:min_detections])
+
+    # https://github.com/opencv/opencv/issues/11085
+    object_points = np.asarray(object_points, dtype=np.float64)
+    image_points_l = np.asarray(image_points_l, dtype=np.float64)
+    image_points_r = np.asarray(image_points_r, dtype=np.float64)
+
+    # shape: (N_frame, 1, N_points, {3,2})
+    object_points = object_points.reshape(N,1,-1,3)
+    image_points_l = image_points_l.reshape(N,1,-1,2)
+    image_points_r = image_points_r.reshape(N,1,-1,2)
+
+    print(object_points.shape)
+    print(image_points_l.shape)
+    print(image_points_r.shape)
+
+    #print(K0l, D0l, K0r, D0r)
+    #print(D0l[0])  # distortion corrupted in rosbag recordings, try latest
+    # use mean distortion
+    D = np.array([-0.00626438, 0.0493399, -0.0463255, 0.00896666])
+    (rms, K1, D1, K2, D2, R, T) = cv2.fisheye.stereoCalibrate(
+        object_points, image_points_l, image_points_r,
+        K0l, D,
+        K0r, D,
+        (800,848),
+        None, None,
+        cv2.fisheye.CALIB_FIX_INTRINSIC | cv2.fisheye.CALIB_CHECK_COND | cv2.fisheye.CALIB_RECOMPUTE_EXTRINSIC | cv2.fisheye.CALIB_FIX_SKEW,
+        (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 5000, 1e-9)
+    )
+
+    #print(rms)
+    #print(R)
+    #print(T)
+
+    #print(K1)
+
+    return (rms, R, T)
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--path',   default="cam", help='output path prefix')
 parser.add_argument('--record',                help='record <filename> to rosbag')
 parser.add_argument('--play',                  help='playback <filename> from rosbag')
+parser.add_argument('--extrinsics', default=False, help='calibrate extrinsics', action='store_true')
 args = parser.parse_args()
 
 if args.record is not None and args.play is not None:
@@ -492,7 +566,7 @@ try:
             frame_copy = {"left"  : left_data,
                           "right" : right_data}
 
-        if z % 100 != 0:  # subsample
+        if z % 100 != 0 or z == 0:  # subsample
             continue
 
         if args.record:
@@ -503,9 +577,9 @@ try:
         # Check if the camera has acquired any frames
         if ts is not None:
             print(z)
-            (ok_l, object_points_l, image_points_l, chess_ids_l) = detect_markers(frame_copy["left"], K0l, D0l)
+            (ok_l, object_points_l, image_points_l, chess_ids_l) = detect_markers("fe1", frame_copy["left"], K0l, D0l)
             if ok_l:
-                (ok_r, object_points_r, image_points_r, chess_ids_r) = detect_markers(frame_copy["right"], K0r, D0r)
+                (ok_r, object_points_r, image_points_r, chess_ids_r) = detect_markers("fe2", frame_copy["right"], K0r, D0r)
                 if ok_r:
                     cv2.imwrite(args.path + "/fe1_%03d.png" % nobservations, frame_copy["left"])
                     cv2.imwrite(args.path + "/fe2_%03d.png" % nobservations, frame_copy["right"])
@@ -527,7 +601,17 @@ try:
     np.savetxt(f, np.array([rms1, rms2]).reshape(1,2))
     f.close()
 
+    if args.extrinsics:
+        (rms, R, T) = calibrate_extrinsics(observations, K1, K2)
+        print("stereo:")
+        print("rms:", rms)
+        print("R:", R)
+        print("T:", T)
+
+        H = np.eye(4)
+        H[:3,:3] = R
+        H[:3, 3] = T.flatten()
+        np.savetxt("H.txt", H, fmt='%.6f')
+
 finally:
-    #d(rms2, K2, D2) = calibrate_observations("right", K0r, D0r)
-    #cv2.destroyAllWindows()
     pipe.stop()
