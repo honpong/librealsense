@@ -461,7 +461,7 @@ try:
     if args.play is None: # can't get this from playback
         (R, T) = get_extrinsics(streams["right"], streams["left"])
 
-    z = 0
+    z = -1
     nobservations = 0
     K1 = D1 = K2= D2 = None
     while True:
@@ -481,7 +481,7 @@ try:
             frame_copy = {"left"  : left_data,
                           "right" : right_data}
 
-        if z % 20 != 0:  # subsample
+        if z % 100 != 0:  # subsample
             continue
 
         if args.record:
@@ -491,10 +491,13 @@ try:
 
         # Check if the camera has acquired any frames
         if ts is not None:
+            print(z)
             (ok_l, object_points_l, image_points_l, chess_ids_l) = detect_markers(frame_copy["left"], K0l, D0l)
             if ok_l:
                 (ok_r, object_points_r, image_points_r, chess_ids_r) = detect_markers(frame_copy["right"], K0r, D0r)
                 if ok_r:
+                    cv2.imwrite(args.path + "/fe1_%03d.png" % nobservations, frame_copy["left"])
+                    cv2.imwrite(args.path + "/fe2_%03d.png" % nobservations, frame_copy["right"])
                     add_observation("left", object_points_l, image_points_l, chess_ids_l)
                     add_observation("right", object_points_r, image_points_r, chess_ids_r)
                     nobservations += 1
