@@ -36,6 +36,11 @@ namespace librealsense
         };
         bool compress_while_record() const override { return false; }
 
+        int  set_intrinsics(int sensor_id, const rs2_intrinsics& intr) override;
+        int  set_extrinsics(const rs2_stream stream_type, int stream_index, const rs2_extrinsics& extr) override;
+        int  set_motion_device_intrinsics(int sensor_id, const rs2_motion_device_intrinsic& intr) override;
+        int  reset_to_factory_calibration() override;
+
     protected:
         void register_stream_to_extrinsic_group(const stream_interface& stream, uint32_t group_index);
 

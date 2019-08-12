@@ -1557,6 +1557,84 @@ namespace librealsense
         _sensor->detach_controller(id);
     }
 
+    int tm2_device::set_intrinsics(int sensor_id, const rs2_intrinsics& intr)
+    {
+        auto convertCameraModelTm2 = [](const rs2_distortion& model) {
+            switch (model) {
+            case RS2_DISTORTION_FTHETA: return 1;
+            case RS2_DISTORTION_NONE:   return 3;
+            case RS2_DISTORTION_KANNALA_BRANDT4: return 4;
+            default: 
+                throw invalid_value_exception("Invalid TM2 camera model");
+            }
+        };
+
+        perc::TrackingData::CameraIntrinsics tm2_intrinsics;
+        tm2_intrinsics.width = intr.width;
+        tm2_intrinsics.height = intr.height;
+        tm2_intrinsics.fx = intr.fx;
+        tm2_intrinsics.fy = intr.fy;
+        tm2_intrinsics.ppx = intr.ppx;
+        tm2_intrinsics.ppy = intr.ppy;
+        tm2_intrinsics.distortionModel = convertCameraModelTm2(intr.model);
+        librealsense::copy_array(tm2_intrinsics.coeffs, intr.coeffs);
+        
+        return (int)_dev->SetCameraIntrinsics(sensor_id, tm2_intrinsics);
+    }
+
+    int tm2_device::set_extrinsics(const rs2_stream stream_type, int stream_index, const rs2_extrinsics& extr)
+    {
+        SensorType type = SensorType::Max;
+        switch (stream_type)
+        {
+        case RS2_STREAM_FISHEYE:
+            type = SensorType::Fisheye;
+            break;
+        case RS2_STREAM_ACCEL:
+            type = SensorType::Accelerometer;
+            break;
+        case RS2_STREAM_GYRO:
+            type = SensorType::Gyro;
+            break;
+        case RS2_STREAM_POSE:
+            type = SensorType::Pose;
+            break;
+        default:
+            throw invalid_value_exception("Invalid stream type");
+        }
+
+        if (type == SensorType::Fisheye)
+        {
+            stream_index--;
+        }
+
+        perc::TrackingData::SensorExtrinsics tm2_extrinsics;
+        tm2_extrinsics.referenceSensorId = -1; //TODO: figure out default common reference sensor id defined internally.
+        librealsense::copy_array(tm2_extrinsics.rotation, extr.rotation);
+        librealsense::copy_array(tm2_extrinsics.translation, extr.translation);
+
+        _dev->SetExtrinsics(SET_SENSOR_ID(type, stream_index), tm2_extrinsics);
+        return -1;
+    }
+
+    int tm2_device::set_motion_device_intrinsics(int sensor_id, const rs2_motion_device_intrinsic& intr)
+    {
+        perc::TrackingData::MotionIntrinsics tm2_motion_intrinsics;
+        librealsense::copy_2darray(tm2_motion_intrinsics.data, intr.data);
+        librealsense::copy_array(tm2_motion_intrinsics.biasVariances, intr.bias_variances);
+        librealsense::copy_array(tm2_motion_intrinsics.noiseVariances, intr.noise_variances);
+
+        return (int)_dev->SetMotionModuleIntrinsics(sensor_id, tm2_motion_intrinsics);
+    }
+
+    int tm2_device::reset_to_factory_calibration()
+    {
+        //DeleteConfiguration will send DEV_RESET_CONFIGURATION message to firmware
+        //but how to reset to factory default needs to be confirmed with the FW.
+        //return (int)_dev->DeleteConfiguration(0);
+        return -1;
+    }
+
     void tm2_device::register_stream_to_extrinsic_group(const stream_interface& stream, uint32_t group_index)
     {
         //TM2 uses POSE sensor as reference sensor for extrinsics
