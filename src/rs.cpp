@@ -2195,6 +2195,40 @@ void rs2_disconnect_tm2_controller(const rs2_device* device, int id, rs2_error**
 }
 HANDLE_EXCEPTIONS_AND_RETURN(, device)
 
+int rs2_set_tm2_intrinsics(const rs2_device* device, int sensor_id, const rs2_intrinsics* intr, rs2_error** error) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL(device);
+    VALIDATE_RANGE(sensor_id, 1, 2);
+    VALIDATE_NOT_NULL(intr);
+
+    auto tm2 = VALIDATE_INTERFACE(device->device, librealsense::tm2_extensions);
+    return tm2->set_intrinsics(sensor_id, *intr);
+}
+HANDLE_EXCEPTIONS_AND_RETURN(-1, device, sensor_id, intr)
+
+int rs2_set_tm2_extrinsics(const rs2_device* device, rs2_stream stream_type, int stream_index, const rs2_extrinsics* extr, rs2_error** error) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL(device);
+    VALIDATE_RANGE(stream_type, rs2_stream::RS2_STREAM_ANY, rs2_stream::RS2_STREAM_COUNT);
+    VALIDATE_RANGE(stream_index, 0, 3);
+    VALIDATE_NOT_NULL(extr);
+
+    auto tm2 = VALIDATE_INTERFACE(device->device, librealsense::tm2_extensions);
+    return tm2->set_extrinsics(stream_type, stream_index, *extr);
+}
+HANDLE_EXCEPTIONS_AND_RETURN(-1, device, stream_type, stream_index, extr)
+
+int  rs2_set_tm2_motion_device_intrinsics(const rs2_device* device, int sensor_id, const rs2_motion_device_intrinsic* intr, rs2_error** error) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL(device);
+    VALIDATE_RANGE(sensor_id, 0, 1);
+    VALIDATE_NOT_NULL(intr);
+
+    auto tm2 = VALIDATE_INTERFACE(device->device, librealsense::tm2_extensions);
+    return tm2->set_motion_device_intrinsics(sensor_id, *intr);
+}
+HANDLE_EXCEPTIONS_AND_RETURN(-1, device, sensor_id, intr)
+
 rs2_processing_block_list* rs2_get_recommended_processing_blocks(rs2_sensor* sensor, rs2_error** error) BEGIN_API_CALL
 {
     VALIDATE_NOT_NULL(sensor);                            
