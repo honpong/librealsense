@@ -46,7 +46,7 @@ board_width = 16
 board_height = 10
 checker_size_m = 0.015
 april_size_m = 0.0075
-min_detections = 15
+min_detections = 5
 
 dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_100)  # 16*10/2 = 80
 board = cv2.aruco.CharucoBoard_create(board_width, board_height, checker_size_m, april_size_m, dictionary)
@@ -566,21 +566,25 @@ try:
             frame_copy = {"left"  : left_data,
                           "right" : right_data}
 
-        if z % 100 != 0 or z == 0:  # subsample
+        if z % 10 != 0:  # subsample
             continue
 
-        if args.record:
-            cv2.imshow("left", frame_copy["left"])
-            cv2.waitKey(1)
-            continue
+        cv2.imshow("left", frame_copy["left"])
+        key = cv2.waitKey(1)
+
+        if key == ord('c'):
+            break
 
         # Check if the camera has acquired any frames
-        if ts is not None:
+        if ts is not None and key == ord('s'):
+            print("snapshot")
             print(z)
             (ok_l, object_points_l, image_points_l, chess_ids_l) = detect_markers("fe1", frame_copy["left"], K0l, D0l)
             if ok_l:
+                print("left ok")
                 (ok_r, object_points_r, image_points_r, chess_ids_r) = detect_markers("fe2", frame_copy["right"], K0r, D0r)
                 if ok_r:
+                    print("right ok")
                     cv2.imwrite(args.path + "/fe1_%03d.png" % nobservations, frame_copy["left"])
                     cv2.imwrite(args.path + "/fe2_%03d.png" % nobservations, frame_copy["right"])
                     add_observation("left", object_points_l, image_points_l, chess_ids_l)
@@ -596,6 +600,7 @@ try:
     save_observations("right", "right.csv")
 
     save_calibration('cals', sn, K1, D1, K2, D2)
+    save_calibration(args.path, sn, K1, D1, K2, D2)
 
     f = open(args.path + '/rmse.txt','a')
     np.savetxt(f, np.array([rms1, rms2]).reshape(1,2))
