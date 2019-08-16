@@ -1629,10 +1629,7 @@ namespace librealsense
 
     int tm2_device::reset_to_factory_calibration()
     {
-        //DeleteConfiguration will send DEV_RESET_CONFIGURATION message to firmware
-        //but how to reset to factory default needs to be confirmed with the FW.
-        //return (int)_dev->DeleteConfiguration(0);
-        return -1;
+        return (int)_dev->DeleteConfiguration(ID_OEM_CAL);
     }
 
     void tm2_device::register_stream_to_extrinsic_group(const stream_interface& stream, uint32_t group_index)
