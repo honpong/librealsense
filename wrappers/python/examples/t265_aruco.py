@@ -35,6 +35,7 @@ import sys
 
 visualize = False
 validate = True  # use factory calibration as GT
+debug = False
 
 # CALIB_FIX_SKEW - Fixes the skew (K[0][1]) to 0
 # CALIB_USE_INTRINSIC_GUESS - uses the K and D input as a guess
@@ -47,6 +48,7 @@ board_height = 10
 checker_size_m = 0.015
 april_size_m = 0.0075
 min_detections = 5
+n_stereo_matches = 15
 
 dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_100)  # 16*10/2 = 80
 board = cv2.aruco.CharucoBoard_create(board_width, board_height, checker_size_m, april_size_m, dictionary)
@@ -153,6 +155,7 @@ def detect_markers_aruco_corner(frame, K, D):
 
 def detect_markers(camera_name, frame, K, D):
     (markers, ids, rejected) = cv2.aruco.detectMarkers(frame, dictionary, parameters=parameters)
+    print("detections:", len(markers))
 
     global nobservations
     if visualize:
@@ -162,6 +165,7 @@ def detect_markers(camera_name, frame, K, D):
         cv2.imwrite(args.path + "/" + camera_name + "_%03d_1_detect_markers.png" % nobservations, detections)
 
     (markers, ids, rejected, _) = cv2.aruco.refineDetectedMarkers(frame, board, markers, ids, rejected, errorCorrectionRate=0, parameters=parameters)
+    print("refined:", len(markers))
 
     if visualize:
         detections = visualize_markers(frame, markers, ids)
@@ -176,6 +180,7 @@ def detect_markers(camera_name, frame, K, D):
 
     if ok:
         (num_refined, chess_corners, chess_ids) = cv2.aruco.interpolateCornersCharuco(markers, ids, frame, board, minMarkers=2) #, cameraMatrix=K) #, distCoeffs=D)
+        print("chess corners:", len(chess_corners))
 
         frame_copy = frame.copy()
         cv2.aruco.drawDetectedCornersCharuco(frame_copy, chess_corners, chess_ids)
@@ -412,7 +417,7 @@ def calibrate_observations(camera_name, Korig, Dorig):
 
     return (rmse, K, D)
 
-def calibrate_extrinsics(observations, K1, K2):
+def calibrate_extrinsics(observations, K1, D1, K2, D2):
     # https://docs.opencv.org/trunk/db/d58/group__calib3d__fisheye.html#gadbb3a6ca6429528ef302c784df47949b
     obs_l = observations["left"]
     obs_r = observations["right"]
@@ -421,6 +426,7 @@ def calibrate_extrinsics(observations, K1, K2):
     image_points_l = []
     image_points_r = []
     N = len(obs_l)
+    N_stereo = 0
     for i in range(N):
         print("Frame #", i)
         (id_to_image_pt_l, obj_i_l, img_i_l, ids_l) = obs_l[i]
@@ -435,17 +441,20 @@ def calibrate_extrinsics(observations, K1, K2):
                 img_i_lr.append(img_i_l[0,j,:])
                 img_i_rl.append(id_to_image_pt_r[ids_l[j,0]])
 
-                #print("ID #", ids_l[j,0], "found in both images")
-                #print("p3D:", obj_i_l[0,j,:])
-                #print("p2D (img1):", img_i_l[0,j,:])
-                #print("p2D (img2):",id_to_image_pt_r[ids_l[j,0]])
-                #print("delta:", img_i_l[0,j,:]-id_to_image_pt_r[ids_l[j,0]])
+                if debug:
+                    print("ID #", ids_l[j,0], "found in both images")
+                    print("p3D:", obj_i_l[0,j,:])
+                    print("p2D (img1):", img_i_l[0,j,:])
+                    print("p2D (img2):",id_to_image_pt_r[ids_l[j,0]])
+                    print("delta:", img_i_l[0,j,:]-id_to_image_pt_r[ids_l[j,0]])
 
         print("detections:", len(obj_i))
 
-        object_points.append(obj_i[:min_detections])  # ToDo: use min. of union over all frames (then possibly improve)
-        image_points_l.append(img_i_lr[:min_detections])
-        image_points_r.append(img_i_rl[:min_detections])
+        if len(obj_i) >= n_stereo_matches:
+            object_points.append(obj_i[:n_stereo_matches])
+            image_points_l.append(img_i_lr[:n_stereo_matches])
+            image_points_r.append(img_i_rl[:n_stereo_matches])
+            N_stereo = N_stereo + 1
 
     # https://github.com/opencv/opencv/issues/11085
     object_points = np.asarray(object_points, dtype=np.float64)
@@ -453,33 +462,23 @@ def calibrate_extrinsics(observations, K1, K2):
     image_points_r = np.asarray(image_points_r, dtype=np.float64)
 
     # shape: (N_frame, 1, N_points, {3,2})
-    object_points = object_points.reshape(N,1,-1,3)
-    image_points_l = image_points_l.reshape(N,1,-1,2)
-    image_points_r = image_points_r.reshape(N,1,-1,2)
+    object_points = object_points.reshape(N_stereo,1,-1,3)
+    image_points_l = image_points_l.reshape(N_stereo,1,-1,2)
+    image_points_r = image_points_r.reshape(N_stereo,1,-1,2)
 
     print(object_points.shape)
     print(image_points_l.shape)
     print(image_points_r.shape)
 
-    #print(K0l, D0l, K0r, D0r)
-    #print(D0l[0])  # distortion corrupted in rosbag recordings, try latest
-    # use mean distortion
-    D = np.array([-0.00626438, 0.0493399, -0.0463255, 0.00896666])
     (rms, K1, D1, K2, D2, R, T) = cv2.fisheye.stereoCalibrate(
         object_points, image_points_l, image_points_r,
-        K0l, D,
-        K0r, D,
+        K1, D1,
+        K2, D2,
         (800,848),
         None, None,
         cv2.fisheye.CALIB_FIX_INTRINSIC | cv2.fisheye.CALIB_CHECK_COND | cv2.fisheye.CALIB_RECOMPUTE_EXTRINSIC | cv2.fisheye.CALIB_FIX_SKEW,
         (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 5000, 1e-9)
     )
-
-    #print(rms)
-    #print(R)
-    #print(T)
-
-    #print(K1)
 
     return (rms, R, T)
 
@@ -607,7 +606,7 @@ try:
     f.close()
 
     if args.extrinsics:
-        (rms, R, T) = calibrate_extrinsics(observations, K1, K2)
+        (rms, R, T) = calibrate_extrinsics(observations, K1, D1, K2, D2)
         print("stereo:")
         print("rms:", rms)
         print("R:", R)
