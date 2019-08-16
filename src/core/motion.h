@@ -57,6 +57,7 @@ namespace librealsense
         virtual int  set_extrinsics(const rs2_stream stream_type, int stream_index, const rs2_extrinsics& extr) = 0;
         virtual int  set_motion_device_intrinsics(int sensor_id, const rs2_motion_device_intrinsic& intr) = 0;
         virtual int  reset_to_factory_calibration() = 0;
+        virtual int  write_calibration() = 0;
     };
     MAP_EXTENSION(RS2_EXTENSION_TM2, librealsense::tm2_extensions);
 }

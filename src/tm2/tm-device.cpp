@@ -1627,6 +1627,11 @@ namespace librealsense
         return (int)_dev->SetMotionModuleIntrinsics(sensor_id, tm2_motion_intrinsics);
     }
 
+    int tm2_device::write_calibration()
+    {
+        return (int)_dev->WriteConfiguration(ID_OEM_CAL, 0, nullptr);
+    }
+
     int tm2_device::reset_to_factory_calibration()
     {
         return (int)_dev->DeleteConfiguration(ID_OEM_CAL);
