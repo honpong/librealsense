@@ -2229,6 +2229,22 @@ int rs2_set_tm2_motion_device_intrinsics(const rs2_device* device, int sensor_id
 }
 HANDLE_EXCEPTIONS_AND_RETURN(-1, device, sensor_id, intr)
 
+int rs2_reset_tm2_to_factory_calibration(const rs2_device* device, rs2_error** error) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL(device);
+    auto tm2 = VALIDATE_INTERFACE(device->device, librealsense::tm2_extensions);
+    return tm2->reset_to_factory_calibration();
+}
+HANDLE_EXCEPTIONS_AND_RETURN(-1, device)
+
+int rs2_write_tm2_calibration(const rs2_device* device, rs2_error** error) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL(device);
+    auto tm2 = VALIDATE_INTERFACE(device->device, librealsense::tm2_extensions);
+    return tm2->write_calibration();
+}
+HANDLE_EXCEPTIONS_AND_RETURN(-1, device)
+
 rs2_processing_block_list* rs2_get_recommended_processing_blocks(rs2_sensor* sensor, rs2_error** error) BEGIN_API_CALL
 {
     VALIDATE_NOT_NULL(sensor);                            

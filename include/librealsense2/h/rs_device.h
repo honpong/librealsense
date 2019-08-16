@@ -186,6 +186,14 @@ int rs2_set_tm2_motion_device_intrinsics(const rs2_device* device, int sensor_id
 int rs2_reset_tm2_to_factory_calibration(const rs2_device* device, rs2_error** e);
 
 /**
+* Write calibration to tm2 device's EEPROM
+* \param[in] device       tm2 device
+* \param[out] error       If non-null, receives any error that occurs during this call, otherwise, errors are ignored
+* \return 0 if the operation is completed successfully.
+*/
+int rs2_write_tm2_calibration(const rs2_device* device, rs2_error** e);
+
+/**
 * Update device to the provided firmware, the device must be extendable to RS2_EXTENSION_UPDATABLE.
 * This call is executed on the caller's thread and it supports progress notifications via the optional callback.
 * \param[in]  device        Device to update
