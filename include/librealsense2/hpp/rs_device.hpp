@@ -546,6 +546,20 @@ namespace rs2
             error::handle(e);
             return status == 0;
         }
+
+        /**
+        * Write calibration to tm2 device's EEPROM
+        * \param[in] device       tm2 device
+        * \param[out] error       If non-null, receives any error that occurs during this call, otherwise, errors are ignored
+        * \return true if the operation is completed successfully.
+        */
+        bool write_calibration()
+        {
+            rs2_error* e = nullptr;
+            int status = rs2_write_tm2_calibration(_dev.get(), &e);
+            error::handle(e);
+            return status == 0;
+        }
     };
 }
 #endif // LIBREALSENSE_RS2_DEVICE_HPP
