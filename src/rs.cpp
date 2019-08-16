@@ -2218,7 +2218,7 @@ int rs2_set_tm2_extrinsics(const rs2_device* device, rs2_stream stream_type, int
 }
 HANDLE_EXCEPTIONS_AND_RETURN(-1, device, stream_type, stream_index, extr)
 
-int  rs2_set_tm2_motion_device_intrinsics(const rs2_device* device, int sensor_id, const rs2_motion_device_intrinsic* intr, rs2_error** error) BEGIN_API_CALL
+int rs2_set_tm2_motion_device_intrinsics(const rs2_device* device, int sensor_id, const rs2_motion_device_intrinsic* intr, rs2_error** error) BEGIN_API_CALL
 {
     VALIDATE_NOT_NULL(device);
     VALIDATE_RANGE(sensor_id, 0, 1);

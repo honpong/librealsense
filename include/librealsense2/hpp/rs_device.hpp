@@ -537,7 +537,7 @@ namespace rs2
         * Reset tm2 to factory calibration
         * \param[in] device       tm2 device
         * \param[out] error       If non-null, receives any error that occurs during this call, otherwise, errors are ignored
-        * \return true if the operation is completed.
+        * \return true if the operation is completed successfully.
         */
         bool reset_to_factory_calibration()
         {
