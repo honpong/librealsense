@@ -37,9 +37,6 @@ visualize = False
 validate = True  # use factory calibration as GT
 debug = False
 
-# CALIB_FIX_SKEW - Fixes the skew (K[0][1]) to 0
-# CALIB_USE_INTRINSIC_GUESS - uses the K and D input as a guess
-# CALIB_RECOMPUTE_EXTRINSICS - Recomputing the pose of the target every iteration, if we don't do this it only computes it once (at the start)
 flags = cv2.fisheye.CALIB_FIX_SKEW | cv2.fisheye.CALIB_USE_INTRINSIC_GUESS | cv2.fisheye.CALIB_RECOMPUTE_EXTRINSIC | cv2.fisheye.CALIB_FIX_PRINCIPAL_POINT
 criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 5000, 1e-9)
 
@@ -50,10 +47,9 @@ april_size_m = 0.0075
 min_detections = 5
 n_stereo_matches = 15
 
-dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_100)  # 16*10/2 = 80
+dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_100)
 board = cv2.aruco.CharucoBoard_create(board_width, board_height, checker_size_m, april_size_m, dictionary)
 parameters = cv2.aruco.DetectorParameters_create()
-
 
 import errno
 def ensure_path(path):
@@ -63,95 +59,10 @@ def ensure_path(path):
         if exception.errno != errno.EEXIST:
             raise
 
-"""
-Returns R, T transform from src to dst
-"""
-def get_extrinsics(src, dst):
-    extrinsics = src.get_extrinsics_to(dst)
-    R = np.reshape(extrinsics.rotation, [3,3]).T
-    T = np.array(extrinsics.translation)
-    return (R, T)
-
-"""
-Returns a camera matrix K from librealsense intrinsics
-"""
-def camera_matrix(intrinsics):
-    return np.array([[intrinsics.fx,             0, intrinsics.ppx],
-                     [            0, intrinsics.fy, intrinsics.ppy],
-                     [            0,             0,              1]])
-
-"""
-Returns the fisheye distortion from librealsense intrinsics
-"""
-def fisheye_distortion(intrinsics):
-    return np.array(intrinsics.coeffs[:4])
-
-
-
 def visualize_markers(frame, markers, ids):
     frame_copy = frame.copy()
     cv2.aruco.drawDetectedMarkers(frame_copy, markers, ids)
     return frame_copy
-
-
-dets = -1
-def detect_markers_aruco_corner(frame, K, D):
-    parameters.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_SUBPIX
-    parameters.cornerRefinementWinSize = 1
-    parameters.minCornerDistanceRate = 0.2
-
-    (markers, ids, rejected) = cv2.aruco.detectMarkers(frame, dictionary, parameters=parameters)
-
-    global dets
-    dets += 1
-    if visualize:
-        detections = visualize_markers(frame, markers, ids)
-        cv2.imshow("detected markers", detections)
-        cv2.waitKey(1)
-        cv2.imwrite("tmp/%03d_1_detect_markers.png" % dets, detections)
-
-    (markers, ids, rejected, _) = cv2.aruco.refineDetectedMarkers(frame, board, markers, ids, rejected, errorCorrectionRate=0, parameters=parameters)
-
-    if visualize:
-        detections = visualize_markers(frame, markers, ids)
-        cv2.imshow("detected markers (refined)", detections)
-        cv2.waitKey(1)
-        cv2.imwrite("tmp/%03d_2_detect_markers_refined.png" % dets, detections)
-
-    ok = ids is not None and len(ids) > min_detections
-    if not ok:
-        return (False, None, None, None)
-
-    image_points = []
-    object_points = []
-    inlier_ids = []
-    for i in range(len(ids)):
-        id1 = ids[i][0]
-        ul = markers[i][0][0]
-        #print(markers[i][0][0])
-        row = m.floor(id1 / (board_width/2)) # only 8 tags per row in a board 16 wide
-        col = id1 % (board_width/2)
-        if row >= board_height: # 80 total tags, 8 x 10 high
-            print("Got a bad id", id1)
-            continue # bad id
-        odd_offset = row % 2 == 1
-        row = (board_height-1) - row # switches origin to bottom left
-        x = col * 2 * checker_size_m # ignores offset from corner to corner of apriltag (global offset)
-        y = row * checker_size_m
-        if odd_offset:
-            x += checker_size_m
-        object_point = (x, y, 0)
-        image_points.append(ul)
-        object_points.append([x, y, 0])
-        inlier_ids.append([id1])
-        #print("id", id1, "row", row, "col", col, "object", x, y, 0, "image", ul)
-        # it seems like object y may be inverted from what I expect
-
-
-    chess_ids = np.array(inlier_ids)
-    object_points = np.reshape(np.array(object_points), (1, -1, 3))
-    image_points = np.reshape(np.array(image_points), (1, -1, 2))
-    return (True, object_points, image_points, chess_ids)
 
 def detect_markers(camera_name, frame, K, D):
     (markers, ids, rejected) = cv2.aruco.detectMarkers(frame, dictionary, parameters=parameters)
@@ -203,8 +114,6 @@ def detect_markers(camera_name, frame, K, D):
     image_points = np.reshape(np.array(chess_corners), (1, -1, 2))
 
     print(object_points.shape)
-    #print(image_points.shape)
-    #print(chess_ids.shape)
     return (True, object_points, image_points, chess_ids)
 
 observations = {"left" : [], "right" : []}
@@ -218,21 +127,9 @@ def add_observation(camera_name, object_points, image_points, ids):
     observations[camera_name].append((id_to_image_pt, object_points, image_points, ids))
     print("Total observations for %s: %d" % (camera_name, len(observations[camera_name])))
 
-def min_dist_for_id(camera_name, feature_id, image_point):
-    min_dist = 1000
-    for (id_to_image_pt, object_points, image_points, ids) in observations[camera_name]:
-        if feature_id not in id_to_image_pt: continue
-        dist = np.linalg.norm(id_to_image_pt[feature_id] - image_point)
-        if dist < min_dist:
-            min_dist = dist
-    return min_dist
-
-def theta_d(theta, D):
-    return theta*( 1+D[0]*np.power(theta,2)+D[1]*np.power(theta,4)+D[2]*np.power(theta,6)+D[3]*np.power(theta,8) )
-
 def add_camera_calibration(K,D):
     cam = OrderedDict()
-    cam['size_px'] = [848, 800]  # TODO: read
+    cam['size_px'] = [848, 800]
     cam['center_px'] = [K[0,2], K[1,2]]
     cam['focal_length_px'] = [K[0,0], K[1,1]]
     cam['distortion'] = OrderedDict()
@@ -241,6 +138,8 @@ def add_camera_calibration(K,D):
     return cam
 
 def save_calibration(directory, sn, K1, D1, K2, D2):
+    # This will be converted to use librealsense API to write to
+    # T261 eeprom
     calib = OrderedDict()  # in order (cam1,cam2)
     calib['device_id'] = sn
     calib['device_type'] = ""
@@ -254,27 +153,7 @@ def save_calibration(directory, sn, K1, D1, K2, D2):
     with open(directory + '/cam' + str(sn)[-4:] + '_intrinsics.json', 'w') as f:
         json.dump(calib, f, indent=4)
 
-import csv
-def save_observations(camera_name, filename):
-    obs = observations[camera_name]
-    with open(filename, "w") as f:
-        o = csv.writer(f)
-        o.writerow(["image_number", "id", "obj_x", "obj_y", "obj_z", "img_x", "img_y"])
-        for i in range(len(obs)):
-            (id_to_image_pt, obj_i, img_i, ids) = obs[i]
-            #print("shape", ids.shape, obj_i.shape, img_i.shape)
-            for j in range(ids.shape[0]):
-                #print(i, j, ids[j][0], obj_i[0][j], img_i[0][j])
-                o.writerow([i, ids[j][0], obj_i[0][j][0], obj_i[0][j][1], obj_i[0][j][2], img_i[0][j][0], img_i[0][j][1]])
-
-def evaluate_calibration(camera_name, object_points, image_points, identification, rvec, tvec, K, D, Korig, Dorig, pixel_thresh = None):
-    if validate:
-        print("dfx[%]:", (K[0,0]/Korig[0,0]-1)*100 )  # to percent
-        print("dfy[%]:", (K[1,1]/Korig[1,1]-1)*100 )  # to percent
-        print("cx[px]:", K[0,2]-Korig[0,2])
-        print("cy[px]:", K[1,2]-Korig[1,2])
-        # TODO: D 70, 80, 85, 90
-
+def evaluate_calibration(camera_name, object_points, image_points, identification, rvec, tvec, K, D, pixel_thresh = None):
     plot_scatter = False
     rms = 0.0
     N = 0
@@ -336,6 +215,8 @@ def evaluate_calibration(camera_name, object_points, image_points, identificatio
 
     # distortion
     if visualize:
+        def theta_d(theta, D):
+            return theta*( 1+D[0]*np.power(theta,2)+D[1]*np.power(theta,4)+D[2]*np.power(theta,6)+D[3]*np.power(theta,8) )
         theta = np.linspace(0,m.pi/2)
         Dmean = np.array([-0.00626438, 0.0493399, -0.0463255, 0.00896666])
         Dorig = [-0.00217445590533316,      0.0376055203378201,     -0.0364043116569519,  0.00593686196953058]  # TODO: read
@@ -351,22 +232,12 @@ def evaluate_calibration(camera_name, object_points, image_points, identificatio
 
     return (inlier_object_points, inlier_image_points)
 
-def save_poses(filename, rvec, tvec):
-    with open(filename, "w") as f:
-        o = csv.writer(f)
-        o.writerow(["frame_number", "t_x [m]", "t_y [m]", "t_z [m]", "r_x [rad]", "r_y [rad]", "r_z [rad]"])
-        for i in range(len(tvec)):
-            t = tvec[i]  # matrix
-            r = rvec[i]
-            o.writerow([ i, t[0,0], t[1,0], t[2,0], r[0,0], r[1,0], r[2,0] ])
-
-def calibrate_observations(camera_name, Korig, Dorig):
+def calibrate_observations(camera_name):
     obs = observations[camera_name]
     object_points = []
     image_points = []
     identification = []
     for (id_to_image_pt, obj_i, img_i, ids) in obs:
-        #print(obj_i.shape)
         object_points.append(obj_i)
         image_points.append(img_i)
         identification.append(ids)
@@ -375,45 +246,39 @@ def calibrate_observations(camera_name, Korig, Dorig):
     image_size = (848, 800)
     Kguess = np.zeros((3,3))
     Kguess[0][0] = Kguess[1][1] = 285
-    #Kguess[0][2] = image_size[0]/2
-    #Kguess[1][2] = image_size[1]/2
-    Kguess[0][2] = Korig[0,2]
-    Kguess[1][2] = Korig[1,2]
+    Kguess[0][2] = image_size[0]/2
+    Kguess[1][2] = image_size[1]/2
 
     initial_flags = flags
     (rmse, K, D, rvec, tvec) = cv2.fisheye.calibrate(objectPoints = object_points,
-                                                                                    imagePoints = image_points,
-                                                                                    image_size = image_size,
-                                                                                    K = Kguess,
-                                                                                    D = Dguess,
-                                                                                    flags = initial_flags,
-                                                                                    criteria = criteria)
+                                                     imagePoints = image_points,
+                                                     image_size = image_size,
+                                                     K = Kguess,
+                                                     D = Dguess,
+                                                     flags = initial_flags,
+                                                     criteria = criteria)
     print("rmse", rmse)
     print("camera", K)
     print("distortion_coeffs", np.array2string(D, separator=', '))
-    #print("rvec", rvec)
-    #print("tvec", tvec)
 
 
-    (inlier_object, inlier_image) = evaluate_calibration(camera_name, object_points, image_points, identification, rvec, tvec, K, Dguess, Korig, Dorig, rmse*3) # 2 pixel
+    (inlier_object, inlier_image) = evaluate_calibration(camera_name, object_points, image_points, identification, rvec, tvec, K, Dguess, rmse*3)
     # object points is a python list of M items which are each (1, N, 3) np.arrays
     # image points is a python list of M items which are each (1, N, 2) np.arrays
     print(len(inlier_image), "images remaining")
     final_flags = flags
     (rmse, K, D, rvec, tvec) = cv2.fisheye.calibrate(objectPoints = inlier_object,
-                                                                                    imagePoints = inlier_image,
-                                                                                    image_size = image_size,
-                                                                                    K = K,
-                                                                                    D = D,
-                                                                                    flags = final_flags,
-                                                                                    criteria = criteria)
+                                                     imagePoints = inlier_image,
+                                                     image_size = image_size,
+                                                     K = K,
+                                                     D = D,
+                                                     flags = final_flags,
+                                                     criteria = criteria)
     print("refined rmse", rmse)
     print("camera", K)
     print("distortion_coeffs", np.array2string(D, separator=', '))
 
-    save_poses(args.path + '/poses_' + camera_name + ".txt", rvec, tvec)
-
-    evaluate_calibration(camera_name, inlier_object, inlier_image, None, rvec, tvec, K, Dguess, Korig, Dorig)
+    evaluate_calibration(camera_name, inlier_object, inlier_image, None, rvec, tvec, K, Dguess)
 
     return (rmse, K, D)
 
@@ -541,11 +406,6 @@ try:
     D0r = fisheye_distortion(intrinsics["right"])
     (width, height) = (intrinsics["left"].width, intrinsics["left"].height)
 
-    # Get thre relative extrinsics between the left and right camera
-    if args.play is None: # can't get this from playback
-        (R, T) = get_extrinsics(streams["right"], streams["left"])
-
-    z = -1
     nobservations = 0
     K1 = D1 = K2= D2 = None
     while True:
@@ -554,8 +414,6 @@ try:
         if not success:
             break
         if frames.is_frameset():
-            z+=1
-            #print(z)
             frameset = frames.as_frameset()
             f1 = frameset.get_fisheye_frame(1).as_video_frame()
             f2 = frameset.get_fisheye_frame(2).as_video_frame()
@@ -564,9 +422,6 @@ try:
             ts = frameset.get_timestamp() # valid
             frame_copy = {"left"  : left_data,
                           "right" : right_data}
-
-        if z % 10 != 0:  # subsample
-            continue
 
         cv2.imshow("left", frame_copy["left"])
         key = cv2.waitKey(1)
@@ -577,7 +432,6 @@ try:
         # Check if the camera has acquired any frames
         if ts is not None and key == ord('s'):
             print("snapshot")
-            print(z)
             (ok_l, object_points_l, image_points_l, chess_ids_l) = detect_markers("fe1", frame_copy["left"], K0l, D0l)
             if ok_l:
                 print("left ok")
@@ -595,13 +449,10 @@ try:
     (rms1, K1, D1) = calibrate_observations("left", K0l, D0l)
     print()
     (rms2, K2, D2) = calibrate_observations("right", K0r, D0r)
-    save_observations("left", "left.csv")
-    save_observations("right", "right.csv")
 
-    save_calibration('cals', sn, K1, D1, K2, D2)
     save_calibration(args.path, sn, K1, D1, K2, D2)
 
-    f = open(args.path + '/rmse.txt','a')
+    f = open(args.path + '/rmse.txt','w')
     np.savetxt(f, np.array([rms1, rms2]).reshape(1,2))
     f.close()
 
