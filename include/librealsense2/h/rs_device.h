@@ -147,6 +147,53 @@ void rs2_connect_tm2_controller(const rs2_device* device, const unsigned char* m
 void rs2_disconnect_tm2_controller(const rs2_device* device, int id, rs2_error** error);
 
 /**
+* Set tm2 camera intrinsics
+* \param[in] device       tm2 device
+* \param[in] sensor_id    specify fisheye lens
+* \param[in] intr         intrinsics value to be written to the device
+* \param[out] error       If non-null, receives any error that occurs during this call, otherwise, errors are ignored
+* \return 0 if the operation is completed successfully.
+*/
+void rs2_set_tm2_intrinsics(const rs2_device* device, int sensor_id, const rs2_intrinsics* intr, rs2_error** error);
+
+/**
+   * Set tm2 camera extrinsics
+   * \param[in] device          tm2 device
+   * \param[in] stream_type     sensor stream type
+   * \param[in] stream_index    sensor stream index
+   * \param[in] extr            extrinsics value to be written to the device
+   * \param[out] error          If non-null, receives any error that occurs during this call, otherwise, errors are ignored
+   * \return 0 if the operation is completed successfully.
+   */
+void rs2_set_tm2_extrinsics(const rs2_device* device, rs2_stream stream_type, int stream_index, const rs2_extrinsics* extr, rs2_error** error);
+
+/**
+* Set tm2 motion device intrinsics
+* \param[in] device        tm2 device
+* \param[in] sensor_id     The ID of the motion sensor
+* \param[in] intr          intrinsics value to be written to the device
+* \param[out] error        If non-null, receives any error that occurs during this call, otherwise, errors are ignored
+* \return 0 if the operation is completed successfully.
+*/
+void rs2_set_tm2_motion_device_intrinsics(const rs2_device* device, rs2_stream stream_type, int steram_index, const rs2_motion_device_intrinsic* intr, rs2_error** error);
+
+/** 
+* Reset tm2 to factory calibration
+* \param[in] device       tm2 device
+* \param[out] error       If non-null, receives any error that occurs during this call, otherwise, errors are ignored
+* \return 0 if the operation is completed successfully.
+*/
+void rs2_reset_tm2_to_factory_calibration(const rs2_device* device, rs2_error** e);
+
+/**
+* Write calibration to tm2 device's EEPROM
+* \param[in] device       tm2 device
+* \param[out] error       If non-null, receives any error that occurs during this call, otherwise, errors are ignored
+* \return 0 if the operation is completed successfully.
+*/
+void rs2_write_tm2_calibration(const rs2_device* device, rs2_error** e);
+
+/**
 * Update device to the provided firmware, the device must be extendable to RS2_EXTENSION_UPDATABLE.
 * This call is executed on the caller's thread and it supports progress notifications via the optional callback.
 * \param[in]  device        Device to update
