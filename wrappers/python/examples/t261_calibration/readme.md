@@ -6,22 +6,30 @@ In order to provide the best tracking, an accurate calibration of T261 is requir
 
 This python sample supports the basic functionality of capturing N stereo image pairs, performing an intrinsic calibration for both cameras and writing out the calibration data into a json calibration file. In a future version this will be replaced with calls to librealsense to directly write the calibration to the device.
 
+## Setup
+
+### Hardware
+* Calibration target: The calibration process requires a ChAruCo target (10x16) printed on a rigid surface of approximately the size of a US letter or A4 at 100% scale. (Please check printer settings which might be different from default!)
+
+* Lighting: Sufficient and uniform lighting and a uniform background (that can cover up to around half of the field of view) are important for good and repeatable calibration results.
+
+* View points: Six static poses are provided, your procedure should aim to replicating them as closely as possible. It is recommended to create a mechanical fixture or use a robot to execute the poses as closely as possible and achieve repeatable calibration results. The camera images in poses.pdf can be used for a visual check of the camera poses for your device setup.
+
+
+### Software
+Please follow the installation instructions at the start of the python script.
+
+## Running the T261 calibration sample
+
 Steps:
-* Capture N stereo image pairs (press key 's'). Images are accepted if minimum number of detections are found in both images.
-* After N stereo pairs are captured, calibration can be run (press key 'c').
+0. Make sure that the camera lens is clean to get the best images.
+1. Capture N stereo image pairs (press key 's'). Images are accepted if minimum number of detections are found in both images.
+2. After N stereo pairs are captured, calibration can be run (press key 'c').
     * Two calibration steps are performed for each camera, a first initial calibration and, after outlier removal, a second refined calibration.
     * The reprojection error (RMSE) of the refined calibration should be below 0.5 pixel for a good calibration (for the below defined set of poses and calibration target).
     * Also good coverage of the whole field of view is important and for this the below listed poses should be followed as closely as possible to obtain repeatable calibration results within our defined target accuracy. The maximum distance of detections to the camera principal point should be at least 350 pixel to allow estimation of the fisheye lens distortion towards the edges.
-* After a successful calibration the calibration data is saved to a json file (in the same folder where the calibration was run).
+3. After a successful calibration the calibration data is saved to a json file (in the same folder where the calibration was run).
 
-This calibration requires a ChAruCo target (10x16) printed in US letter size (100% scale) on a rigid surface.
-
-Six static poses are provided, your procedure should aim to replicating them as closely as possible. The camera images in poses.pdf can be used to visually align the camera pose to your device setup.
-
-In addition to a rigid calibration target, sufficient and uniform lighting and a uniform background (that can cover up to around half of the field of view) are important for good and repeatable calibration results.
-
-Please follow the installation instructions at the start of the python script.
-
-## Playback
+### Playback
 
 The tool also supports playback from a folder of images for debugging. Use the argument `--images` to provide the input data
