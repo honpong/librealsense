@@ -30,6 +30,7 @@ import errno
 from collections import OrderedDict
 import json
 import argparse
+import sys
 
 
 # Enable this for more verbose printing
