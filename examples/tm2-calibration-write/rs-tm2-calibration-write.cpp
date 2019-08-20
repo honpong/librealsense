@@ -3,6 +3,7 @@
 #include <librealsense2/rs.hpp>
 #include <iostream>
 #include <iomanip>
+#include <string.h>
 
 using namespace std;
 
