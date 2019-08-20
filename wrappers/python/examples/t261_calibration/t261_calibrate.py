@@ -69,12 +69,12 @@ n_stereo_matches = 15
 flags = cv2.fisheye.CALIB_FIX_SKEW                      # Fix the skew of K to 0
 flags = flags | cv2.fisheye.CALIB_USE_INTRINSIC_GUESS   # Use a guess for the camera matrix
 flags = flags | cv2.fisheye.CALIB_RECOMPUTE_EXTRINSIC   # Recompute the relative poses of the target each time
-flags = flags | cv2.fisheye.CALIB_FIX_PRINCIPAL_POINT   # Fix the principal point
 criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 5000, 1e-9)
 
 
 # global variable to store detections
 observations = {"left" : [], "right" : []}
+image_size = None
 
 # Check that a path exists and create it if needed
 def ensure_path(path):
@@ -118,7 +118,7 @@ Detection proceeds in four steps:
     - Return the chessboard corners, ids, and real world points (aka object points) for this detection
 """
 def detect_markers(camera_name, frame):
-    global n_frame
+    global n_frame, image_size
 
     (markers, ids, rejected) = cv2.aruco.detectMarkers(frame, dictionary, parameters=parameters)
     if debug:
@@ -271,6 +271,7 @@ def evaluate_calibration(camera_name, object_points, image_points, identificatio
 Take a set of observations of the targets and use OpenCVs fisheye calibration module to calibrate the intrinsics of the camera. Do this by first estimating a rough calibration, then using this rough identification to reject poor detections, and then compute a refined calibration.
 """
 def calibrate_observations(camera_name, K0, D0):
+    global image_size
     obs = observations[camera_name]
     object_points = []
     image_points = []
@@ -279,16 +280,12 @@ def calibrate_observations(camera_name, K0, D0):
         object_points.append(obj_i)
         image_points.append(img_i)
         identification.append(ids)
-    #Dguess = np.zeros((4,1))
+    # mean distortion
     Dguess = np.array([-0.00626438, 0.0493399, -0.0463255, 0.00896666])
-    image_size = (848, 800)  # TODO: global or read
     Kguess = np.zeros((3,3))
     Kguess[0][0] = Kguess[1][1] = 285
-    #Kguess[0][2] = image_size[0]/2
-    #Kguess[1][2] = image_size[1]/2
-    # TODO: determine whether principal point from internal calibration
-    Kguess[0][2] = K0[0][2]
-    Kguess[1][2] = K0[1][2]
+    Kguess[0][2] = image_size[0]/2
+    Kguess[1][2] = image_size[1]/2
 
     initial_flags = flags
     (rmse, K, D, rvec, tvec) = cv2.fisheye.calibrate(objectPoints = object_points,
@@ -394,58 +391,77 @@ def calibrate_extrinsics(observations, K1, D1, K2, D2):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--path', default=".", help='calibration output path')
-    #parser.add_argument('--images', help='image folder input path')
+    parser.add_argument('--images', help='image folder input path')
     parser.add_argument('--extrinsics', default=False, help='calibrate extrinsics', action='store_true')
     args = parser.parse_args()
     tmp_folder = "tmp"
 
     try:
-        pipe = rs.pipeline()
-        pipe.start()
 
-        # Retreive serial number and internal calibration
-        profiles = pipe.get_active_profile()
-        dev = profiles.get_device()
-        sn = dev.get_info(rs.camera_info.serial_number)
+        if args.images:
+            sn = "playback"
+        else:
+            pipe = rs.pipeline()
+            pipe.start()
+
+            # Retreive serial number and internal calibration
+            profiles = pipe.get_active_profile()
+            dev = profiles.get_device()
+            sn = dev.get_info(rs.camera_info.serial_number)
+
         print("Serial number:", sn)
         tmp_folder = tmp_folder + "/cam_" + sn + "/"
         ensure_path(tmp_folder)
 
-        streams = (
-            profiles.get_stream(rs.stream.fisheye, 1).as_video_stream_profile(),
-            profiles.get_stream(rs.stream.fisheye, 2).as_video_stream_profile()
-        )
-        intrinsics = (streams[0].get_intrinsics(), streams[1].get_intrinsics())
-        print("Left camera:",  intrinsics[0])
-        print("Right camera:", intrinsics[1])
+        if not args.images:
+            streams = (
+                profiles.get_stream(rs.stream.fisheye, 1).as_video_stream_profile(),
+                profiles.get_stream(rs.stream.fisheye, 2).as_video_stream_profile()
+            )
+            intrinsics = (streams[0].get_intrinsics(), streams[1].get_intrinsics())
+            print("Left camera:",  intrinsics[0])
+            print("Right camera:", intrinsics[1])
 
-        # Internal calibration (initial guess, converted to OpenCV format)
-        K0l  = camera_matrix(intrinsics[0])
-        D0l  = fisheye_distortion(intrinsics[0])
-        K0r = camera_matrix(intrinsics[1])
-        D0r = fisheye_distortion(intrinsics[1])
-        (width, height) = (intrinsics[0].width, intrinsics[0].height)
+            # Internal calibration (initial guess, converted to OpenCV format)
+            K0l  = camera_matrix(intrinsics[0])
+            D0l  = fisheye_distortion(intrinsics[0])
+            K0r = camera_matrix(intrinsics[1])
+            D0r = fisheye_distortion(intrinsics[1])
+            (width, height) = (intrinsics[0].width, intrinsics[0].height)
+        else:
+            K0l = K0r = np.eye(3)
+            D0l = D0r = np.array((4,1))
 
         n_frame = 0
+        frame_index = 0
         while True:
-            success, frames = pipe.try_wait_for_frames(timeout_ms=1000)
-            if not success or not frames.is_frameset():
-                break
-            frameset = frames.as_frameset()
-            f1 = frameset.get_fisheye_frame(1).as_video_frame()
-            f2 = frameset.get_fisheye_frame(2).as_video_frame()
-            stereo_pair = (np.asanyarray(f1.get_data()), np.asanyarray(f2.get_data()))
+            if args.images:
+                left = cv2.imread("%s/fe1_%03d.png" % (args.images, frame_index))
+                right = cv2.imread("%s/fe2_%03d.png" % (args.images, frame_index))
+                frame_index += 1
+                if left is None or right is None:
+                    break
+                stereo_pair = (left, right)
+            else:
+                success, frames = pipe.try_wait_for_frames(timeout_ms=1000)
+                if not success or not frames.is_frameset():
+                    break
+                frameset = frames.as_frameset()
+                f1 = frameset.get_fisheye_frame(1).as_video_frame()
+                f2 = frameset.get_fisheye_frame(2).as_video_frame()
+                stereo_pair = (np.asanyarray(f1.get_data()), np.asanyarray(f2.get_data()))
 
             # display (for visual alignment)
             stereo_horizontal = np.hstack((stereo_pair[0], stereo_pair[1]))
+            cv2.namedWindow('Stereo fisheye', cv2.WINDOW_NORMAL)
             cv2.imshow("Stereo fisheye", stereo_horizontal)
             key = cv2.waitKey(1)
 
-            if key == ord('s'):
+            if key == ord('s') or args.images:
                 print("Acquire images")
                 print("Running detection...")
-                (ok1, object_points1, image_points1, chess_ids1) = detect_markers("fe1", stereo_pair[0], K0l, D0l)
-                (ok2, object_points2, image_points2, chess_ids2) = detect_markers("fe2", stereo_pair[1], K0r, D0r)
+                (ok1, object_points1, image_points1, chess_ids1) = detect_markers("fe1", stereo_pair[0])
+                (ok2, object_points2, image_points2, chess_ids2) = detect_markers("fe2", stereo_pair[1])
                 if ok1 and ok2:
                     print("Images accepted")
                     # save images
@@ -457,41 +473,41 @@ if __name__ == "__main__":
                     n_frame += 1
 
             elif key == ord('c'):
-                print("\nCalibrating over", n_frame, "frames")
-                (rms1, K1, D1, support1) = calibrate_observations("left", K0l, D0l)
-                (rms2, K2, D2, support2) = calibrate_observations("right", K0r, D0r)
-
-                print("K_left:", K1)
-                print("D_left:", np.array2string(D1, separator=', '))
-                print("K_right:", K2)
-                print("D_right:", np.array2string(D2, separator=', '))
-
-                print("RMSE left [px]:", rms1)
-                print("RMSE right [px]:", rms2)
-
-                print("Left image support region [px]:", support1)
-                print("Right image support region [px]:", support2)
-
-                # TODO: pass criteria
-
-                save_calibration(args.path, sn, K1, D1, K2, D2)
-
-                f = open(tmp_folder + 'rmse.txt','w')
-                np.savetxt(f, np.array([rms1, rms2]).reshape(1,2))
-                f.close()
-
-                if args.extrinsics:
-                    print("\nStereo calibration")
-                    (rms, R_fe2_fe1, T_fe2_fe1) = calibrate_extrinsics(observations, K1, D1, K2, D2)  # cam1 w.r.t. cam2
-                    print("Left fisheye w.r.t. right")
-                    print("R_fe2_fe1:", R_fe2_fe1)
-                    print("T_fe2_fe1:", T_fe2_fe1)
-                    save_extrinsics(args.path + "/H_fe2_fe1.txt", R_fe2_fe1, T_fe2_fe1)
-
                 break
-
             elif key == ord('q'):
-                break
+                sys.exit(0)
+
+        print("\nCalibrating over", n_frame, "frames")
+        (rms1, K1, D1, support1) = calibrate_observations("left", K0l, D0l)
+        (rms2, K2, D2, support2) = calibrate_observations("right", K0r, D0r)
+
+        print("K_left:", K1)
+        print("D_left:", np.array2string(D1, separator=', '))
+        print("K_right:", K2)
+        print("D_right:", np.array2string(D2, separator=', '))
+
+        print("RMSE left [px]:", rms1)
+        print("RMSE right [px]:", rms2)
+
+        print("Left image support region [px]:", support1)
+        print("Right image support region [px]:", support2)
+
+        # TODO: pass criteria
+
+        save_calibration(args.path, sn, K1, D1, K2, D2)
+
+        f = open(tmp_folder + 'rmse.txt','w')
+        np.savetxt(f, np.array([rms1, rms2]).reshape(1,2))
+        f.close()
+
+        if args.extrinsics:
+            print("\nStereo calibration")
+            (rms, R_fe2_fe1, T_fe2_fe1) = calibrate_extrinsics(observations, K1, D1, K2, D2)  # cam1 w.r.t. cam2
+            print("Left fisheye w.r.t. right")
+            print("R_fe2_fe1:", R_fe2_fe1)
+            print("T_fe2_fe1:", T_fe2_fe1)
+            save_extrinsics(args.path + "/H_fe2_fe1.txt", R_fe2_fe1, T_fe2_fe1)
 
     finally:
-        pipe.stop()
+        if not args.images:
+            pipe.stop()
