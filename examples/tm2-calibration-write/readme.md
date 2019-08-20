@@ -1,9 +1,9 @@
-# rs-pose Sample
+# rs-tm2-calibration-write Sample
 
 > In order to run this example, a device supporting pose stream (T265) is required.
 
 ## Overview
-This sample demonstrates how to write new calibration data into a T265 device.
+This sample demonstrates how to write/read new calibration data into a T265 device.
 
 ## Expected Output
 This sample will test write some calibration data into the OEM session of the device's EEPROM, read them back and them reset to factory calibration.  
