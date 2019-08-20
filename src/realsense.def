@@ -299,6 +299,11 @@ EXPORTS
     rs2_loopback_is_enabled
     rs2_connect_tm2_controller
     rs2_disconnect_tm2_controller
+    rs2_set_tm2_intrinsics
+    rs2_set_tm2_extrinsics
+    rs2_set_tm2_motion_device_intrinsics
+    rs2_reset_tm2_to_factory_calibration
+    rs2_write_tm2_calibration
     rs2_import_localization_map
     rs2_export_localization_map
     rs2_set_static_node
