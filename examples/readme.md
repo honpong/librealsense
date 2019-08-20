@@ -39,7 +39,7 @@ For a detailed explanations and API documentation see our [Documentation](../doc
 |[Sensor Control](./sensor-control)| C++ | A tutorial for using the `rs2::sensor` API | :star::star::star: | [![Depth Sensing - Structured Light, Stereo and L500](https://img.shields.io/badge/-Depth-5bc3ff.svg)](./depth.md) [![Motion Tracking - T260 and SLAM](https://img.shields.io/badge/-Tracking-0e2356.svg)](../doc/t265.md#examples-and-tools) |
 |[GrabCuts](../wrappers/opencv/grabcuts)| C++ & [OpenCV](https://github.com/IntelRealSense/librealsense/tree/master/wrappers/opencv#getting-started) | Simple background removal using the GrabCut algorithm | :star::star::star: | [![Depth Sensing - Structured Light, Stereo and L500](https://img.shields.io/badge/-Depth-5bc3ff.svg)](./depth.md)  |
 |[Latency](../wrappers/opencv/latency-tool)| C++ & [OpenCV](https://github.com/IntelRealSense/librealsense/tree/master/wrappers/opencv#getting-started) | Basic latency estimation using computer vision | :star::star::star: | [![Depth Sensing - Structured Light, Stereo and L500](https://img.shields.io/badge/-Depth-5bc3ff.svg)](./depth.md)  |
-|[TM2 Calibration Write](./tm2-calibration-write)| C++ | Demonstrates how to write/read into OEM calibration session of a T265 device | :star::star::star: | [![Motion Tracking - T260 and SLAM](https://img.shields.io/badge/-Tracking-0e2356.svg)](../doc/t265.md#examples-and-tools)
+|[TM2 Calibration Write](./tm2-calibration-write)| C++ | Demonstrates how to write/read into OEM calibration section of a T265 device | :star::star::star: | [![Motion Tracking - T260 and SLAM](https://img.shields.io/badge/-Tracking-0e2356.svg)](../doc/t265.md#examples-and-tools)
 
 ### Community Projects:
 
