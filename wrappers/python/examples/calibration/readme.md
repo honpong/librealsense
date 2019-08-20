@@ -2,12 +2,13 @@ In order to provide the best tracking, an accurate calibration of T261 is requir
 
 This python sample supports the basic functionality of capturing N stereo image pairs, performing an intrinsic calibration for both cameras and writing out the calibration data into a json calibration file. In a future version this will be replaced with calls to librealsense to directly write the calibration to the device.
 
-    Capture N stereo image pairs (press key 's'). Images are accepted if minimum number of detections are found in both images.
-    After N stereo pairs are captured, calibration can be run (press key 'c').
-        Two calibration steps are performed for each camera, a first initial calibration and, after outlier removal, a second refined calibration.
-        The reprojection error (RMSE) of the refined calibration should be below 0.5 pixel for a good calibration (for the below defined set of poses and calibration target).
-        Also good coverage of the whole field of view is important and for this the below listed poses should be followed as closely as possible to obtain repeatable calibration results within our defined target accuracy. The maximum distance of detections to the camera principal point should be at least 350 pixel to allow estimation of the fisheye lens distortion towards the edges.
-    After a successful calibration the calibration data is saved to a json file (in the same folder where the calibration was run).
+Steps:
+* Capture N stereo image pairs (press key 's'). Images are accepted if minimum number of detections are found in both images.
+* After N stereo pairs are captured, calibration can be run (press key 'c').
+    * Two calibration steps are performed for each camera, a first initial calibration and, after outlier removal, a second refined calibration.
+    * The reprojection error (RMSE) of the refined calibration should be below 0.5 pixel for a good calibration (for the below defined set of poses and calibration target).
+    * Also good coverage of the whole field of view is important and for this the below listed poses should be followed as closely as possible to obtain repeatable calibration results within our defined target accuracy. The maximum distance of detections to the camera principal point should be at least 350 pixel to allow estimation of the fisheye lens distortion towards the edges.
+* After a successful calibration the calibration data is saved to a json file (in the same folder where the calibration was run).
 
 The calibration requires a ChAruCo target (10x16) printed in US letter size (100% scale) on a rigid surface.
 
