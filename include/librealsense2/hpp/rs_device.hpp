@@ -517,7 +517,7 @@ namespace rs2
 
         /** 
         * Set tm2 motion device intrinsics
-        * \param[in] sensor_id     The ID of the motion sensor
+        * \param[in] stream_type   stream type of the motion device
         * \param[in] intr          intrinsics value to be written to the device
         */
         void set_motion_device_intrinsics(rs2_stream stream_type, const rs2_motion_device_intrinsic& intr)
