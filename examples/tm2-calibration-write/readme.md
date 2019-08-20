@@ -6,7 +6,7 @@
 This sample demonstrates how to write/read new calibration data into a T265 device.
 
 ## Expected Output
-This sample will test write some calibration data into the OEM session of the device's EEPROM, read them back and them reset to factory calibration.  
+This sample will test write some calibration data into the OEM section of the device's EEPROM, read them back and then reset to factory calibration.  
 
 ## Code Overview
 
@@ -16,7 +16,7 @@ All but advanced functionality is provided through a single header:
 #include <librealsense2/rs.hpp> // Include RealSense Cross Platform API
 ```
 
-First we test write some calibration data into the OEM session of the device's EEPROM inside `test_write_oem_calibration()`:
+First we test write some calibration data into the OEM section of the device's EEPROM inside `test_write_oem_calibration()`:
 
 ```cpp
 // set calibration data into the device's virtual table
