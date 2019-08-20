@@ -1558,6 +1558,111 @@ namespace librealsense
         _sensor->detach_controller(id);
     }
 
+    void tm2_device::set_intrinsics(int sensor_id, const rs2_intrinsics& intr)
+    {
+        auto convertCameraModelTm2 = [](const rs2_distortion& model) {
+            switch (model) {
+            case RS2_DISTORTION_FTHETA: return 1;
+            case RS2_DISTORTION_NONE:   return 3;
+            case RS2_DISTORTION_KANNALA_BRANDT4: return 4;
+            default: 
+                throw invalid_value_exception("Invalid TM2 camera model");
+            }
+        };
+
+        perc::TrackingData::CameraIntrinsics tm2_intrinsics;
+        tm2_intrinsics.width = intr.width;
+        tm2_intrinsics.height = intr.height;
+        tm2_intrinsics.fx = intr.fx;
+        tm2_intrinsics.fy = intr.fy;
+        tm2_intrinsics.ppx = intr.ppx;
+        tm2_intrinsics.ppy = intr.ppy;
+        tm2_intrinsics.distortionModel = convertCameraModelTm2(intr.model);
+        librealsense::copy_array(tm2_intrinsics.coeffs, intr.coeffs);
+        
+        auto status = _dev->SetCameraIntrinsics(SET_SENSOR_ID(SensorType::Fisheye, sensor_id -1), tm2_intrinsics);
+        if (status != perc::Status::SUCCESS) {
+            throw io_exception(to_string() << "Error T2xx set intrinsics, status = " << (uint32_t)status);
+        }
+    }
+
+    void tm2_device::set_extrinsics(rs2_stream stream_type, int stream_index, const rs2_extrinsics& extr)
+    {
+        SensorType type = SensorType::Max;
+        switch (stream_type)
+        {
+        case RS2_STREAM_FISHEYE:
+            type = SensorType::Fisheye;
+            break;
+        case RS2_STREAM_ACCEL:
+            type = SensorType::Accelerometer;
+            break;
+        case RS2_STREAM_GYRO:
+            type = SensorType::Gyro;
+            break;
+        case RS2_STREAM_POSE:
+            type = SensorType::Pose;
+            break;
+        default:
+            throw invalid_value_exception("Invalid stream type");
+        }
+
+        if (type == SensorType::Fisheye)
+        {
+            stream_index--;
+        }
+
+        perc::TrackingData::SensorExtrinsics tm2_extrinsics;
+        tm2_extrinsics.referenceSensorId = -1; //TODO: figure out default common reference sensor id defined internally.
+        librealsense::copy_array(tm2_extrinsics.rotation, extr.rotation);
+        librealsense::copy_array(tm2_extrinsics.translation, extr.translation);
+
+        auto status = _dev->SetExtrinsics(SET_SENSOR_ID(type, stream_index), tm2_extrinsics);
+        if (status != perc::Status::SUCCESS) {
+            throw io_exception(to_string() << "Error in T2xx set extrinsics, status = " << (uint32_t)status);
+        }
+    }
+
+    void tm2_device::set_motion_device_intrinsics(rs2_stream stream_type, int stream_index, const rs2_motion_device_intrinsic& intr)
+    {
+        if (stream_index != 0) {
+            throw invalid_value_exception("Invalid stream type");
+        }
+        SensorType type = SensorType::Max;
+        switch (stream_type) {
+        case RS2_STREAM_GYRO: type = SensorType::Gyro; break;
+        case RS2_STREAM_ACCEL: type = SensorType::Accelerometer; break;
+        default:
+            throw invalid_value_exception("Invalid stream type");
+        }
+
+        perc::TrackingData::MotionIntrinsics tm2_motion_intrinsics;
+        librealsense::copy_2darray(tm2_motion_intrinsics.data, intr.data);
+        librealsense::copy_array(tm2_motion_intrinsics.biasVariances, intr.bias_variances);
+        librealsense::copy_array(tm2_motion_intrinsics.noiseVariances, intr.noise_variances);
+
+        auto status = _dev->SetMotionModuleIntrinsics(SET_SENSOR_ID(type, 0), tm2_motion_intrinsics);
+        if (status != perc::Status::SUCCESS) {
+            throw io_exception(to_string() << "Error in T2xx set motion device intrinsics, status = " << (uint32_t)status);
+        }
+    }
+
+    void tm2_device::write_calibration()
+    {
+        auto status = _dev->WriteConfiguration(ID_OEM_CAL, 0, nullptr);
+        if (status != perc::Status::SUCCESS) {
+            throw io_exception(to_string() << "Error T2xx set motion device intrinsics, status = " << (uint32_t)status);
+        }
+    }
+
+    void tm2_device::reset_to_factory_calibration()
+    {
+        auto status = _dev->DeleteConfiguration(ID_OEM_CAL);
+        if (status != perc::Status::SUCCESS) {
+            throw io_exception(to_string() << "Error in T2xx reset to factory calibration, status = " << (uint32_t)status);
+        }
+    }
+
     void tm2_device::register_stream_to_extrinsic_group(const stream_interface& stream, uint32_t group_index)
     {
         //TM2 uses POSE sensor as reference sensor for extrinsics
