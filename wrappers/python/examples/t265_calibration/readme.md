@@ -1,4 +1,8 @@
-In order to provide the best tracking, an accurate calibration of T261 is required. When you install the T261 module in your device you will change the extrinsics of this calibration slightly, and when you cover the module with glass you change the distortion of the images, so recalibration is required. In this example we provide a sample flow to calculate the new intrinsics and extrinsics of the stereo camera pair in T261 and write these parameters to the internal device memory on T261.
+# Calibrating a T261 module after assembly into a product
+
+In order to provide the best tracking, an accurate calibration of T261 is required. When you install the T261 module in your device you will change the extrinsics of this calibration slightly, and when you cover the module with glass you change the distortion of the images, so recalibration is required. In this example we provide a sample flow to calculate the new intrinsics and extrinsics of the stereo camera pair in T261 and write these parameters to the internal device memory on T261. The maker of the product integrating T261 should take this flow as a representative example and adapt it to whatever is most appropriate for the product and production line.
+
+## Overview
 
 This python sample supports the basic functionality of capturing N stereo image pairs, performing an intrinsic calibration for both cameras and writing out the calibration data into a json calibration file. In a future version this will be replaced with calls to librealsense to directly write the calibration to the device.
 

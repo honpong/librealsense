@@ -33,9 +33,26 @@ import argparse
 from calibration_utils import *
 
 
+# Enable this for more verbose printing
 debug = False
 
-# calibration target parameters
+"""
+This example uses a ChArUco target and the parameters of it are
+defined below. You can generate your own target using a pattern
+generator, for example:
+
+https://calib.io/pages/camera-calibration-pattern-generator
+
+and you can purchase ready-made targets as well:
+
+https://calib.io/collections/checkerboards/products/charuco-targets
+
+If you decide to use your own target, you should adjust
+detect_markers below to detect your pattern and return the image and
+corresponding object points and make sure that the relative position
+of the target and the T261 is such that you cover the same regions of
+the lenses.
+"""
 board_width = 16
 board_height = 10
 checker_size_m = 0.015
@@ -46,21 +63,21 @@ board = cv2.aruco.CharucoBoard_create(board_width, board_height, checker_size_m,
 parameters = cv2.aruco.DetectorParameters_create()
 
 # detection parameters
-min_detections = 5  # TODO: increase
+min_detections = 5
 n_stereo_matches = 15
 
-# calibration parameters
-flags = cv2.fisheye.CALIB_FIX_SKEW
-flags = flags | cv2.fisheye.CALIB_USE_INTRINSIC_GUESS
-flags = flags | cv2.fisheye.CALIB_RECOMPUTE_EXTRINSIC
-flags = flags | cv2.fisheye.CALIB_FIX_PRINCIPAL_POINT
+# OpenCV fisheye calibration parameters
+flags = cv2.fisheye.CALIB_FIX_SKEW                      # Fix the skew of K to 0
+flags = flags | cv2.fisheye.CALIB_USE_INTRINSIC_GUESS   # Use a guess for the camera matrix
+flags = flags | cv2.fisheye.CALIB_RECOMPUTE_EXTRINSIC   # Recompute the relative poses of the target each time
+flags = flags | cv2.fisheye.CALIB_FIX_PRINCIPAL_POINT   # Fix the principal point
 criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 5000, 1e-9)
 
 
 # global variable to store detections
 observations = {"left" : [], "right" : []}
 
-
+# Check that a path exists and create it if needed
 def ensure_path(path):
     try:
         os.makedirs(path)
@@ -68,18 +85,30 @@ def ensure_path(path):
         if exception.errno != errno.EEXIST:
             raise
 
-
+# Show the AruCo marker detections
 def visualize_markers(frame, markers, ids):
     frame_copy = frame.copy()
     cv2.aruco.drawDetectedMarkers(frame_copy, markers, ids)
     return frame_copy
 
+# Show the interpolated chessboard corners derived from the AruCo detections
 def visualize_chess_corners(frame, chess_corners, chess_ids):
     frame_copy = frame.copy()
     cv2.aruco.drawDetectedCornersCharuco(frame_copy, chess_corners, chess_ids)
     return frame_copy
 
-def detect_markers(camera_name, frame, K, D):
+"""
+Detect the ChAruCo target in a frame and return object and image points for it.
+
+ChAruCo targets essentially composed of a chessboard overlayed with Apriltag fiducial markers in the white squares.
+
+Detection proceeds in four steps:
+    - Detect the initial set of Apriltags in the image
+    - Reject or correct the Apriltags based on a known board layout
+    - Find a subpixel location for the chessboard corner nearest to each Apriltag
+    - Return the chessboard corners, ids, and real world points (aka object points) for this detection
+"""
+def detect_markers(camera_name, frame):
     global n_frame
 
     (markers, ids, rejected) = cv2.aruco.detectMarkers(frame, dictionary, parameters=parameters)
@@ -97,7 +126,7 @@ def detect_markers(camera_name, frame, K, D):
     if ids is None or len(ids) < min_detections:
         return (False, None, None, None)
 
-    (n_chess, chess_corners, chess_ids) = cv2.aruco.interpolateCornersCharuco(markers, ids, frame, board, minMarkers=2) #, cameraMatrix=K) #, distCoeffs=D)
+    (n_chess, chess_corners, chess_ids) = cv2.aruco.interpolateCornersCharuco(markers, ids, frame, board, minMarkers=2)
     if debug:
         print("Number of chess corners:", len(chess_corners))
     detections = visualize_chess_corners(frame, chess_corners, chess_ids)
@@ -119,6 +148,9 @@ def detect_markers(camera_name, frame, K, D):
 
     return (True, object_points, image_points, chess_ids)
 
+"""
+Adds an observation of the target for camera_name
+"""
 def add_observation(camera_name, object_points, image_points, ids):
     global observations
     id_to_image_pt = {}
@@ -127,6 +159,15 @@ def add_observation(camera_name, object_points, image_points, ids):
     observations[camera_name].append((id_to_image_pt, object_points, image_points, ids))
     print("Total frames for %s camera: %d" % (camera_name, len(observations[camera_name])))
 
+"""
+The next three functions define a temporary interface for writing calibrations to file for inspection purposes. This will be replaced with direct calls to T261 librealsense APIs for setting the calibration in a future version. Once that is ready, it will look something like:
+
+    fe1 = profiles.get_stream(rs.stream.fisheye, 1).as_video_stream_profile()
+    fe2 = profiles.get_stream(rs.stream.fisheye, 2).as_video_stream_profile()
+    fe1.set_intrinsics(fe1_intrinsics)
+    fe2.set_intrinsics(fe2_intrinsics)
+    fe1.set_extrinsics_to(fe2, extrinsics)
+"""
 def add_camera_calibration(K, D):
     cam = OrderedDict()
     cam['size_px'] = [848, 800]  # hard-coded
@@ -159,6 +200,9 @@ def save_extrinsics(filename, R, T):
     H[:3, 3] = T.flatten()
     np.savetxt(filename, H, fmt='%.6f')
 
+"""
+Check the result of a calibration, plotting the distribution of the reprojection error and identifying likely outlier points
+"""
 def evaluate_calibration(camera_name, object_points, image_points, identification, rvec, tvec, K, D, pixel_thresh = None):
     N_frames = len(object_points)  # number of frames
     inlier_object_points = []
@@ -214,6 +258,9 @@ def evaluate_calibration(camera_name, object_points, image_points, identificatio
 
     return (inlier_object_points, inlier_image_points, d_max)
 
+"""
+Take a set of observations of the targets and use OpenCVs fisheye calibration module to calibrate the intrinsics of the camera. Do this by first estimating a rough calibration, then using this rough identification to reject poor detections, and then compute a refined calibration.
+"""
 def calibrate_observations(camera_name, K0, D0):
     obs = observations[camera_name]
     object_points = []
@@ -270,6 +317,9 @@ def calibrate_observations(camera_name, K0, D0):
 
     return (rmse, K, D, support)
 
+"""
+Compute the extrinsics between the two cameras. This assumes the intrinsics for both cameras are already correct
+"""
 def calibrate_extrinsics(observations, K1, D1, K2, D2):
     # https://docs.opencv.org/trunk/db/d58/group__calib3d__fisheye.html#gadbb3a6ca6429528ef302c784df47949b
     obs_l = observations["left"]
