@@ -489,6 +489,67 @@ namespace rs2
             rs2_disconnect_tm2_controller(_dev.get(), id, &e);
             error::handle(e);
         }
+
+        /**
+        * Set tm2 camera intrinsics
+        * \param[in] sensor_id    The ID of the fisheye sensor
+        * \param[in] intr         intrinsics value to be written to the device
+        */
+        void set_intrinsics(int sensor_id, const rs2_intrinsics& intr)
+        {
+            rs2_error* e = nullptr;
+            rs2_set_tm2_intrinsics(_dev.get(), sensor_id, &intr, &e);
+            error::handle(e);
+        }
+
+        /**
+        * Set tm2 camera extrinsics
+        * \param[in] stream_type     sensor stream type
+        * \param[in] stream_index    sensor stream index
+        * \param[in] extr            extrinsics value to be written to the device
+        */
+        void set_extrinsics(rs2_stream stream_type, int stream_index, const rs2_extrinsics& extr)
+        {
+            rs2_error* e = nullptr;
+            rs2_set_tm2_extrinsics(_dev.get(), stream_type, stream_index, &extr, &e);
+            error::handle(e);
+        }
+
+        /** 
+        * Set tm2 motion device intrinsics
+        * \param[in] sensor_id     The ID of the motion sensor
+        * \param[in] intr          intrinsics value to be written to the device
+        */
+        void set_motion_device_intrinsics(rs2_stream stream_type, const rs2_motion_device_intrinsic& intr)
+        {
+            rs2_error* e = nullptr;
+            rs2_set_tm2_motion_device_intrinsics(_dev.get(), stream_type, 0, &intr, &e);
+            error::handle(e);
+        }
+
+        /**
+        * Reset tm2 to factory calibration
+        * \param[in] device       tm2 device
+        * \param[out] error       If non-null, receives any error that occurs during this call, otherwise, errors are ignored
+        */
+        void reset_to_factory_calibration()
+        {
+            rs2_error* e = nullptr;
+            rs2_reset_tm2_to_factory_calibration(_dev.get(), &e);
+            error::handle(e);
+        }
+
+        /**
+        * Write calibration to tm2 device's EEPROM
+        * \param[in] device       tm2 device
+        * \param[out] error       If non-null, receives any error that occurs during this call, otherwise, errors are ignored
+        */
+        void write_calibration()
+        {
+            rs2_error* e = nullptr;
+            rs2_write_tm2_calibration(_dev.get(), &e);
+            error::handle(e);
+        }
     };
 }
 #endif // LIBREALSENSE_RS2_DEVICE_HPP
