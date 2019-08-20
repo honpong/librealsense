@@ -36,6 +36,12 @@ namespace librealsense
         };
         bool compress_while_record() const override { return false; }
 
+        void set_intrinsics(int sensor_id, const rs2_intrinsics& intr) override;
+        void set_extrinsics(rs2_stream stream_type, int stream_index, const rs2_extrinsics& extr) override;
+        void set_motion_device_intrinsics(rs2_stream stream_type, int stream_index, const rs2_motion_device_intrinsic& intr) override;
+        void reset_to_factory_calibration() override;
+        void write_calibration() override;
+
     protected:
         void register_stream_to_extrinsic_group(const stream_interface& stream, uint32_t group_index);
 
@@ -47,6 +53,8 @@ namespace librealsense
         std::shared_ptr<perc::TrackingManager> _manager;
         perc::TrackingDevice* _dev;
         std::shared_ptr<tm2_sensor> _sensor;
+
+        static const uint16_t ID_OEM_CAL = 6;
     };
 
     class tm2_sensor : public sensor_base, public video_sensor_interface, public wheel_odometry_interface,

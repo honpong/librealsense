@@ -52,6 +52,12 @@ namespace librealsense
         virtual void connect_controller(const std::array<uint8_t, 6>& mac_address) = 0;
         virtual void disconnect_controller(int id) = 0;
         virtual ~tm2_extensions() = default;
+
+        virtual void set_intrinsics(int sensor_id, const rs2_intrinsics& intr) = 0;
+        virtual void set_extrinsics(const rs2_stream stream_type, int stream_index, const rs2_extrinsics& extr) = 0;
+        virtual void set_motion_device_intrinsics(rs2_stream stream_type, int stream_index, const rs2_motion_device_intrinsic& intr) = 0;
+        virtual void reset_to_factory_calibration() = 0;
+        virtual void write_calibration() = 0;
     };
     MAP_EXTENSION(RS2_EXTENSION_TM2, librealsense::tm2_extensions);
 }
