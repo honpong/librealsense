@@ -30,7 +30,6 @@ import errno
 from collections import OrderedDict
 import json
 import argparse
-from calibration_utils import *
 
 
 # Enable this for more verbose printing
@@ -84,6 +83,16 @@ def ensure_path(path):
     except OSError as exception:
         if exception.errno != errno.EEXIST:
             raise
+
+# Returns a camera matrix K from librealsense intrinsics
+def camera_matrix(intrinsics):
+    return np.array([[intrinsics.fx,             0, intrinsics.ppx],
+                     [            0, intrinsics.fy, intrinsics.ppy],
+                     [            0,             0,              1]])
+
+# Returns the kb4 distortion coefficients
+def fisheye_distortion(intrinsics):
+    return np.array(intrinsics.coeffs[:4])
 
 # Show the AruCo marker detections
 def visualize_markers(frame, markers, ids):
