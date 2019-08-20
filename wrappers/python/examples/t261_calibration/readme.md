@@ -14,10 +14,14 @@ Steps:
     * Also good coverage of the whole field of view is important and for this the below listed poses should be followed as closely as possible to obtain repeatable calibration results within our defined target accuracy. The maximum distance of detections to the camera principal point should be at least 350 pixel to allow estimation of the fisheye lens distortion towards the edges.
 * After a successful calibration the calibration data is saved to a json file (in the same folder where the calibration was run).
 
-The calibration requires a ChAruCo target (10x16) printed in US letter size (100% scale) on a rigid surface.
+This calibration requires a ChAruCo target (10x16) printed in US letter size (100% scale) on a rigid surface.
 
 Six static poses are provided, your procedure should aim to replicating them as closely as possible. The camera images in poses.pdf can be used to visually align the camera pose to your device setup.
 
 In addition to a rigid calibration target, sufficient and uniform lighting and a uniform background (that can cover up to around half of the field of view) are important for good and repeatable calibration results.
 
-Please follow the installation instructions at the header of the python script.
+Please follow the installation instructions at the start of the python script.
+
+## Playback
+
+The tool also supports playback from a folder of images for debugging. Use the argument `--images` to provide the input data
