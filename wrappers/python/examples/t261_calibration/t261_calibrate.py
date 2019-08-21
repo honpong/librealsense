@@ -31,6 +31,7 @@ from collections import OrderedDict
 import json
 import argparse
 import sys
+import csv
 
 
 # Enable this for more verbose printing
@@ -268,6 +269,15 @@ def evaluate_calibration(camera_name, object_points, image_points, identificatio
 
     return (inlier_object_points, inlier_image_points, d_max)
 
+def save_poses(filename, rvec, tvec):
+    with open(filename, "w") as f:
+        o = csv.writer(f)
+        o.writerow(["frame_number", "t_x [m]", "t_y [m]", "t_z [m]", "r_x [rad]", "r_y [rad]", "r_z [rad]"])
+        for i in range(len(tvec)):
+            t = tvec[i]  # matrix
+            r = rvec[i]
+            o.writerow([i] + ["{:.3f}".format(x) for x in t.flatten().tolist() + r.flatten().tolist()])
+
 """
 Take a set of observations of the targets and use OpenCVs fisheye calibration module to calibrate the intrinsics of the camera. Do this by first estimating a rough calibration, then using this rough identification to reject poor detections, and then compute a refined calibration.
 """
@@ -319,6 +329,8 @@ def calibrate_observations(camera_name, K0, D0):
         print("rmse", rmse)
         print("K:", K)
         print("D:", np.array2string(D, separator=', '))
+
+    save_poses(tmp_folder + 'poses_' + camera_name + ".txt", rvec, tvec)
 
     (_, _, support) = evaluate_calibration(camera_name, inlier_object, inlier_image, None, rvec, tvec, K, Dguess)
 
