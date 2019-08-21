@@ -13,6 +13,7 @@ $ source py3librs/bin/activate  # activate the venv, do this from every terminal
 $ pip install opencv-python     # install opencv 4.1 in the venv
 $ pip install opencv-contrib-python     # install opencv 4.1 in the venv
 $ pip install pyrealsense2      # install librealsense python bindings
+$ pip install matplotlib        # install matplotlib in the venv
 
 Then, for every new terminal:
 
