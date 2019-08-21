@@ -91,9 +91,7 @@ bool test_write_oem_calibration()
 {
     rs2::context ctx;
     for (auto dev : ctx.query_devices()) {
-        auto name = dev.get_info(rs2_camera_info::RS2_CAMERA_INFO_NAME);
-        if (strcmp(name, "Intel RealSense T265") == 0) {
-            auto tm2 = dev.as<rs2::tm2>();
+        if (auto tm2 = dev.as<rs2::tm2>()) {
             rs2_intrinsics fisheye_intrinsics[2] = {};
             rs2_motion_device_intrinsic motion_intrinsics[2] = {};
 
@@ -111,13 +109,11 @@ bool test_write_oem_calibration()
     return false;
 }
 
-void test_read_oem_calibration()
+void test_read_oem_calibration(bool reset_factory_default = false)
 {
     rs2::context ctx;
     for (auto dev : ctx.query_devices()) {
-        auto name = dev.get_info(rs2_camera_info::RS2_CAMERA_INFO_NAME);
-        if (strcmp(name, "Intel RealSense T265") == 0) {
-            auto tm2 = dev.as<rs2::tm2>();
+        if (auto tm2 = dev.as<rs2::tm2>()) {
             for (auto sensor : tm2.query_sensors()) {
                 for (auto profile : sensor.get_stream_profiles()) {
                     // read camera intrinsics calibration
@@ -130,16 +126,24 @@ void test_read_oem_calibration()
                     }
                 }
             }
-            tm2.reset_to_factory_calibration(); // reset to factory calibration
+            if (reset_factory_default) { tm2.reset_to_factory_calibration(); } // reset to factory calibration
         }
     }
 }
 
 int main(int argc, char * argv[]) try
 {
+    std::cout << " -------------------- (1) Original Calibration ---------------------- " << std::endl;
+    test_read_oem_calibration();
+
     if (test_write_oem_calibration() == true) {
-        test_read_oem_calibration();
+        std::cout << " -------------------- (2) Modified Calibration ---------------------- " << std::endl;
+        test_read_oem_calibration(true);
     }
+
+    std::cout << " -------------------- (3) Reset Calibration ---------------------- " << std::endl;
+    test_read_oem_calibration();
+
     return EXIT_SUCCESS;
 }
 catch (const rs2::error & e)
