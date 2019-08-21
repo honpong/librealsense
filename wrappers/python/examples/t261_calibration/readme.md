@@ -33,3 +33,43 @@ Steps:
 ### Playback
 
 The tool also supports playback from a folder of images for debugging. Use the argument `--images` to provide the input data
+
+## Positions
+### Overview
+A list of camera poses can be found in [poses_left.txt](poses_left.txt) and [poses_right.txt](poses_right.txt).
+The camera poses are expressed with respect to the calibration target frame (as depicted below).
+
+<img class="image" src="doc/img/poses_xz_centered.png" width="45%"> <img class="image" src="doc/img/poses_yz_centered.png" width="45%">
+
+<img class="image" src="doc/img/chaxis.png" width="50%">
+
+
+### Position 1
+![pose1](doc/img/pose1.png)
+
+<img class="image" src="data/fe1_000.png" width="45%"> <img class="image" src="data/fe2_000.png" width="45%">
+
+### Position 2
+![pose2](doc/img/pose2.png)
+
+<img class="image" src="data/fe1_001.png" width="45%"> <img class="image" src="data/fe2_001.png" width="45%">
+
+### Position 3
+![pose3](doc/img/pose3.png)
+
+<img class="image" src="data/fe1_002.png" width="45%"> <img class="image" src="data/fe2_002.png" width="45%">
+
+### Position 4
+![pose4](doc/img/pose4.png)
+
+<img class="image" src="data/fe1_003.png" width="45%"> <img class="image" src="data/fe2_003.png" width="45%">
+
+### Position 5
+![pose5](doc/img/pose5.png)
+
+<img class="image" src="data/fe1_004.png" width="45%"> <img class="image" src="data/fe2_004.png" width="45%">
+
+### Position 6
+![pose6](doc/img/pose6.png)
+
+<img class="image" src="data/fe1_005.png" width="45%"> <img class="image" src="data/fe2_005.png" width="45%">
