@@ -8,16 +8,10 @@
 ####################################################################
 
 import pyrealsense2 as rs
-import time
 
 ctx = rs.context()
 
-devs = None
-while not devs:
-    devs = ctx.query_devices()
-    print("Waiting for device...")
-    time.sleep(1)
-print(len(devs), "devices found")
+devs = ctx.query_devices()
 
 tm2 = None
 for dev in devs:
@@ -34,19 +28,19 @@ for dev in devs:
                     vp = profile.as_motion_stream_profile()
                     print(vp.get_motion_intrinsics())
 
-#write_calibration()
+# write
 fisheye_intrinsics = rs.intrinsics()
 motion_intrinsics = rs.motion_device_intrinsic()
+if tm2:
+    tm2.set_intrinsics(1, fisheye_intrinsics)
+    tm2.set_intrinsics(2, fisheye_intrinsics)
 
-tm2.set_intrinsics(1, fisheye_intrinsics)
-tm2.set_intrinsics(2, fisheye_intrinsics)
+    tm2.set_motion_device_intrinsics(rs.stream.accel, motion_intrinsics)
+    tm2.set_motion_device_intrinsics(rs.stream.gyro, motion_intrinsics)
 
-tm2.set_motion_device_intrinsics(rs.stream.accel, motion_intrinsics)
-tm2.set_motion_device_intrinsics(rs.stream.gyro, motion_intrinsics)
+    tm2.write_calibration()
 
-tm2.write_calibration()
-
-# read
+# read 
 for dev in devs:
     tm2 = dev.as_tm2()
     if tm2:
@@ -61,7 +55,8 @@ for dev in devs:
                     vp = profile.as_motion_stream_profile()
                     print(vp.get_motion_intrinsics())
 
-tm2.reset_to_factory_calibration()
+if tm2:
+    tm2.reset_to_factory_calibration()
 
 # read
 for dev in devs:
