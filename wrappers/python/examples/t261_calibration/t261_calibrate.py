@@ -14,6 +14,7 @@ $ pip install opencv-python     # install opencv 4.1 in the venv
 $ pip install opencv-contrib-python     # install opencv 4.1 in the venv
 $ pip install pyrealsense2      # install librealsense python bindings
 $ pip install matplotlib        # install matplotlib in the venv
+$ pip install transformations   # install transformations in the venv
 
 Then, for every new terminal:
 
@@ -33,6 +34,7 @@ import json
 import argparse
 import sys
 import csv
+import transformations as tf
 
 
 # Enable this for more verbose printing
@@ -273,11 +275,17 @@ def evaluate_calibration(camera_name, object_points, image_points, identificatio
 def save_poses(filename, rvec, tvec):
     with open(filename, "w") as f:
         o = csv.writer(f)
-        o.writerow(["frame_number", "t_x [m]", "t_y [m]", "t_z [m]", "r_x [rad]", "r_y [rad]", "r_z [rad]"])
+        o.writerow(["frame number", " homogeneous transformation 3x4 (row-major) camera w.r.t. target"])
         for i in range(len(tvec)):
-            t = tvec[i]  # matrix
-            r = rvec[i]
-            o.writerow([i] + ["{:.3f}".format(x) for x in t.flatten().tolist() + r.flatten().tolist()])
+            t = tvec[i].flatten()
+            r = rvec[i].flatten()
+            # invert => w.r.t. target
+            theta = np.linalg.norm(r)
+            u = r/theta
+            H = tf.rotation_matrix(theta, u)
+            H[:3,3] = t
+            H = np.linalg.inv(H)  # invert => w.r.t. target
+            o.writerow([i] + [" {:6.3f}".format(x) for x in H[:3,:].flatten().tolist()])
 
 """
 Take a set of observations of the targets and use OpenCVs fisheye calibration module to calibrate the intrinsics of the camera. Do this by first estimating a rough calibration, then using this rough identification to reject poor detections, and then compute a refined calibration.
