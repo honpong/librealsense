@@ -370,7 +370,7 @@ PYBIND11_MODULE(NAME, m) {
         .def("disconnect_controller", &rs2::tm2::disconnect_controller, "Disconnects a given tm2 controller", "id"_a)
         .def("set_intrinsics", &rs2::tm2::set_intrinsics, "Set camera intrinsics", "sensor_id"_a, "intrinsics"_a)
         .def("set_extrinsics", &rs2::tm2::set_extrinsics, "Set camera extrinsics", "stream_type"_a, "stream_index"_a, "extrinsics"_a)
-        .def("set_motion_device_intrinsics", &rs2::tm2::set_motion_device_intrinsics, "Set motion device intrinsics", "stream_type"_a, "stream_index"_a, "motion_intrinsics"_a)
+        .def("set_motion_device_intrinsics", &rs2::tm2::set_motion_device_intrinsics, "Set motion device intrinsics", "stream_type"_a, "motion_intrinsics"_a)
         .def("reset_to_factory_calibration", &rs2::tm2::reset_to_factory_calibration, "Reset to factory calibration")
         .def("write_calibration", &rs2::tm2::write_calibration, "Write calibration to device's EEPROM");
 
