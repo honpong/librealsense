@@ -3,31 +3,20 @@
 ## License: Apache 2.0. See LICENSE file in root directory.
 ## Copyright(c) 2019 Intel Corporation. All Rights Reserved.
 
-#####################################################
-##           librealsense T265 example             ##
-#####################################################
+####################################################################
+##           librealsense T261 calibration r/w sample             ##
+####################################################################
 
 import pyrealsense2 as rs
 import time
 
-def clear_all():
-    for name in dir():
-        if not name.startswith('_'):
-            del globals()[name]
-
-
 ctx = rs.context()
 
-#read_calibration()
 devs = None
-
 while not devs:
-
     devs = ctx.query_devices()
-
     print("Waiting for device...")
     time.sleep(1)
-
 print(len(devs), "devices found")
 
 tm2 = None
@@ -52,7 +41,8 @@ motion_intrinsics = rs.motion_device_intrinsic()
 tm2.set_intrinsics(1, fisheye_intrinsics)
 tm2.set_intrinsics(2, fisheye_intrinsics)
 
-#tm2.set_motion_device_intrinsics((1, motion_intrinsics)
+tm2.set_motion_device_intrinsics(rs.stream.accel, motion_intrinsics)
+tm2.set_motion_device_intrinsics(rs.stream.gyro, motion_intrinsics)
 
 tm2.write_calibration()
 
