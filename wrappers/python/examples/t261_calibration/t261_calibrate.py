@@ -410,18 +410,21 @@ def calibrate_extrinsics(observations, K1, D1, K2, D2):
     return (rms, R, T)
 
 def validate_calibration(rms1, rms2, support1, support2):
-    rms_thresh = 0.5
-    min_support = 350
+    rms_thresh = 0.5*2
+    min_support = 350*0.5
     failed = False
+    print()
     if rms1 > rms_thresh or rms2 > rms_thresh:
-        print("\nRMSE exceeds", rms_thresh, "[px]")
+        print("RMSE exceeds", rms_thresh, "[px]")
         failed = True
     if support1 < min_support or support2 < min_support:
-        print("\nImage support region less than", min_support, "[px]")
+        print("Image support region less than", min_support, "[px]")
         failed = True
     if failed:
         print("CALIBRATION FAILED")
         sys.exit()
+    else:
+        print("CALIBRATION PASSED")
 
 def lrs_intrinsics(K, D):
     fe_intrinsics = rs.intrinsics()  # width: 0, height: 0, ppx: 0, ppy: 0, fx: 0, fy: 0, model: None, coeffs: [0, 0, 0, 0, 0]
@@ -438,27 +441,33 @@ def lrs_intrinsics(K, D):
 def reset_calibration():
     ctx = rs.context()
     devs = ctx.query_devices()
+    tm2 = None
     for dev in devs:
         tm2 = dev.as_tm2()
-        if tm2:
-            tm2.reset_to_factory_calibration()
+    if not tm2:
+        print("No device found")
+    else:
+        print("Resetting...")
+        tm2.reset_to_factory_calibration()
+        print("Finished")
 
 def read_calibration():
     ctx = rs.context()
     devs = ctx.query_devices()
+    tm2 = None
     for dev in devs:
         tm2 = dev.as_tm2()
-        if tm2:
-            sensors = tm2.query_sensors()
-            for sensor in sensors:
-                profiles = sensor.get_stream_profiles()
-                for profile in profiles:
-                    if profile.is_video_stream_profile():
-                        vp = profile.as_video_stream_profile()
-                        print(vp.get_intrinsics())
-                    elif profile.is_motion_stream_profile():
-                        vp = profile.as_motion_stream_profile()
-                        print(vp.get_motion_intrinsics())
+    if not tm2:
+        print("No device found")
+    else:
+        print("Reading...")
+        sensors = tm2.query_sensors()
+        for sensor in sensors:
+            profiles = sensor.get_stream_profiles()
+            for profile in profiles:
+                if profile.is_video_stream_profile():
+                    vp = profile.as_video_stream_profile()
+                    print(vp.get_intrinsics())
 
 
 if __name__ == "__main__":
@@ -481,11 +490,10 @@ if __name__ == "__main__":
         sys.exit()
 
     try:
-
         dev = None
         if args.images:
             sn = "playback"
-        #else:
+        else:
             pipe = rs.pipeline()
             profile = pipe.start()
             dev = profile.get_device()
@@ -497,8 +505,8 @@ if __name__ == "__main__":
 
         if not args.images:
             streams = (
-                profiles.get_stream(rs.stream.fisheye, 1).as_video_stream_profile(),
-                profiles.get_stream(rs.stream.fisheye, 2).as_video_stream_profile()
+                profile.get_stream(rs.stream.fisheye, 1).as_video_stream_profile(),
+                profile.get_stream(rs.stream.fisheye, 2).as_video_stream_profile()
             )
             intrinsics = (streams[0].get_intrinsics(), streams[1].get_intrinsics())
             print("Left camera:",  intrinsics[0])
@@ -536,6 +544,7 @@ if __name__ == "__main__":
             # display (for visual alignment)
             stereo_horizontal = np.hstack((stereo_pair[0], stereo_pair[1]))
             cv2.namedWindow('Stereo fisheye', cv2.WINDOW_NORMAL)
+            cv2.resizeWindow('Stereo fisheye', 848*2,800)
             cv2.imshow("Stereo fisheye", stereo_horizontal)
             key = cv2.waitKey(1)
 
@@ -598,7 +607,6 @@ if __name__ == "__main__":
         if key == 'n' and not args.confirm:
             sys.exit()
         else:
-            print("Writing to device...")
             tm2 = None
             if not dev:
                 ctx = rs.context()
@@ -608,7 +616,10 @@ if __name__ == "__main__":
             else:
                 tm2 = dev.as_tm2()
 
-            if tm2:
+            if not tm2:
+                print("No T261 found")
+            else:
+                print("Writing to device...")
                 fe_intrinsics = lrs_intrinsics(K1, D1)
                 tm2.set_intrinsics(1, fe_intrinsics)
 
