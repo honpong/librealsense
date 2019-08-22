@@ -529,7 +529,7 @@ if __name__ == "__main__":
             print("T_fe2_fe1:", T_fe2_fe1)
             #save_extrinsics(args.path + "/H_fe2_fe1.txt", R_fe2_fe1, T_fe2_fe1)
 
-        key = None
+        print()
         while not args.confirm and key not in ['y', 'n']:
             key = input("Write to device? [y/n]: ")
         if not args.confirm and key == 'n':
@@ -537,18 +537,13 @@ if __name__ == "__main__":
         else:
             print("Writing to device...")
             tm2 = None
-            print(dev)
             if not dev:
                 ctx = rs.context()
                 devs = ctx.query_devices()
-                print(len(devs))
-                devs = ctx.query_devices()
-                print(len(devs))
                 for dev in devs:
                     tm2 = dev.as_tm2()
             else:
                 tm2 = dev.as_tm2()
-            print(tm2)
 
             if tm2:
                 fe_intrinsics = rs.intrinsics()
@@ -560,6 +555,7 @@ if __name__ == "__main__":
                 tm2.set_intrinsics(2, fe_intrinsics)
 
                 tm2.write_calibration()
+                print("Finished")
 
 
     finally:
