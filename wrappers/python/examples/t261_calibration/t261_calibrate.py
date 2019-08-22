@@ -409,11 +409,18 @@ def calibrate_extrinsics(observations, K1, D1, K2, D2):
 
     return (rms, R, T)
 
-def validate_calibration(rms1, rms2):
+def validate_calibration(rms1, rms2, support1, support2):
     rms_thresh = 0.5
+    min_support = 350
+    failed = False
     if rms1 > rms_thresh or rms2 > rms_thresh:
-        print("\nCALIBRATION FAILED")
-        print("RMSE exceeds", rms_thresh, "[px]")
+        print("\nRMSE exceeds", rms_thresh, "[px]")
+        failed = True
+    if support1 < min_support or support2 < min_support:
+        print("\nImage support region less than", min_support, "[px]")
+        failed = True
+    if failed:
+        print("CALIBRATION FAILED")
         sys.exit()
 
 def lrs_intrinsics(K, D):
@@ -567,7 +574,8 @@ if __name__ == "__main__":
         print("Left image support region [px]:", support1)
         print("Right image support region [px]:", support2)
 
-        validate_calibration(rms1, rms2)
+        # validation step
+        validate_calibration(rms1, rms2, support1, support2)
 
         save_calibration(args.path, sn, K1, D1, K2, D2)
 
