@@ -409,6 +409,13 @@ def calibrate_extrinsics(observations, K1, D1, K2, D2):
 
     return (rms, R, T)
 
+def validate_calibration(rms1, rms2):
+    rms_thresh = 0.5
+    if rms1 > rms_thresh or rms2 > rms_thresh:
+        print("\nCALIBRATION FAILED")
+        print("RMSE exceeds", rms_thresh, "[px]")
+        sys.exit()
+
 def lrs_intrinsics(K, D):
     fe_intrinsics = rs.intrinsics()  # width: 0, height: 0, ppx: 0, ppy: 0, fx: 0, fy: 0, model: None, coeffs: [0, 0, 0, 0, 0]
     fe_intrinsics.width = 848
@@ -560,7 +567,7 @@ if __name__ == "__main__":
         print("Left image support region [px]:", support1)
         print("Right image support region [px]:", support2)
 
-        # TODO: pass criteria
+        validate_calibration(rms1, rms2)
 
         save_calibration(args.path, sn, K1, D1, K2, D2)
 
