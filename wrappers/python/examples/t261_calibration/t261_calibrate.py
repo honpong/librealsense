@@ -409,6 +409,18 @@ def calibrate_extrinsics(observations, K1, D1, K2, D2):
 
     return (rms, R, T)
 
+def lrs_intrinsics(K, D):
+    fe_intrinsics = rs.intrinsics()  # width: 0, height: 0, ppx: 0, ppy: 0, fx: 0, fy: 0, model: None, coeffs: [0, 0, 0, 0, 0]
+    fe_intrinsics.width = 848
+    fe_intrinsics.height = 800
+    fe_intrinsics.fx = K[0,0]
+    fe_intrinsics.fy = K[1,1]
+    fe_intrinsics.ppx = K[0,2]
+    fe_intrinsics.ppy = K[1,2]
+    fe_intrinsics.model = rs.distortion.kannala_brandt4  # kb4 
+    fe_intrinsics.coeffs = D.tolist() + [0]
+    return fe_intrinsics
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -529,10 +541,11 @@ if __name__ == "__main__":
             print("T_fe2_fe1:", T_fe2_fe1)
             #save_extrinsics(args.path + "/H_fe2_fe1.txt", R_fe2_fe1, T_fe2_fe1)
 
+        # write to device
         print()
-        while not args.confirm and key not in ['y', 'n']:
+        while key not in ['y', 'n'] and not args.confirm:
             key = input("Write to device? [y/n]: ")
-        if not args.confirm and key == 'n':
+        if key == 'n' and not args.confirm:
             sys.exit()
         else:
             print("Writing to device...")
@@ -546,12 +559,10 @@ if __name__ == "__main__":
                 tm2 = dev.as_tm2()
 
             if tm2:
-                fe_intrinsics = rs.intrinsics()
-                fe_intrinsics.fx = K1[0,0]
+                fe_intrinsics = lrs_intrinsics(K1, D1)
                 tm2.set_intrinsics(1, fe_intrinsics)
 
-                fe_intrinsics = rs.intrinsics()
-                fe_intrinsics.fx = K2[0,0]
+                fe_intrinsics = lrs_intrinsics(K2, D2)
                 tm2.set_intrinsics(2, fe_intrinsics)
 
                 tm2.write_calibration()
