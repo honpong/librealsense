@@ -46,16 +46,10 @@ def write_calibration():
             tm2.write_calibration()
 
 ctx = rs.context()
-
 devs = ctx.query_devices()
-
 read_calibration()
-
 write_calibration()
-
 read_calibration()
-
 if tm2:
     tm2.reset_to_factory_calibration()
-
 read_calibration()
