@@ -8,6 +8,8 @@
 ####################################################################
 
 import pyrealsense2 as rs
+import argparse
+import sys
 
 def read_calibration():
     global devs
@@ -45,11 +47,37 @@ def write_calibration():
 
             tm2.write_calibration()
 
-ctx = rs.context()
-devs = ctx.query_devices()
-read_calibration()
-write_calibration()
-read_calibration()
-if tm2:
-    tm2.reset_to_factory_calibration()
-read_calibration()
+def reset_calibration():
+    global devs
+    global tm2
+
+    for dev in devs:
+        tm2 = dev.as_tm2()
+        if tm2:
+            tm2.reset_to_factory_calibration()
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--read', default=False, help='read only', action='store_true')
+    parser.add_argument('--write', default=False, help='read only', action='store_true')
+    parser.add_argument('--reset', default=False, help='read only', action='store_true')
+    args = parser.parse_args()
+    
+    ctx = rs.context()
+    devs = ctx.query_devices()
+    if args.read:
+        read_calibration()
+        sys.exit()
+    if args.write:
+        write_calibration()
+        sys.exit()
+    if args.reset:
+        reset_calibration()
+        sys.exit()
+
+    read_calibration()
+    write_calibration()
+    read_calibration()
+    reset_calibration()
+    read_calibration()
