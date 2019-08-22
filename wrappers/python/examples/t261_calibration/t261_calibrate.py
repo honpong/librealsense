@@ -421,6 +421,14 @@ def lrs_intrinsics(K, D):
     fe_intrinsics.coeffs = D.tolist() + [0]
     return fe_intrinsics
 
+def reset_calibration():
+    ctx = rs.context()
+    devs = ctx.query_devices()
+    for dev in devs:
+        tm2 = dev.as_tm2()
+        if tm2:
+            tm2.reset_to_factory_calibration()
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -428,8 +436,13 @@ if __name__ == "__main__":
     parser.add_argument('--images', help='image folder input path')
     parser.add_argument('--extrinsics', default=False, help='calibrate extrinsics', action='store_true')
     parser.add_argument('--confirm', default=False, help='write calibration to device (w/o prompt)', action='store_true')
+    parser.add_argument('--reset', default=False, help='reset calibration to factory default', action='store_true')
     args = parser.parse_args()
     tmp_folder = "tmp"
+
+    if args.reset:
+        reset_calibration()
+        sys.exit()
 
     try:
 
