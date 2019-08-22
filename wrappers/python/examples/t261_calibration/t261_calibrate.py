@@ -415,7 +415,7 @@ if __name__ == "__main__":
     parser.add_argument('--path', default=".", help='calibration output path')
     parser.add_argument('--images', help='image folder input path')
     parser.add_argument('--extrinsics', default=False, help='calibrate extrinsics', action='store_true')
-    parser.add_argument('--write', default=False, help='write calibration to device', action='store_true')
+    parser.add_argument('--confirm', default=False, help='write calibration to device (w/o prompt)', action='store_true')
     args = parser.parse_args()
     tmp_folder = "tmp"
 
@@ -529,7 +529,13 @@ if __name__ == "__main__":
             print("T_fe2_fe1:", T_fe2_fe1)
             #save_extrinsics(args.path + "/H_fe2_fe1.txt", R_fe2_fe1, T_fe2_fe1)
 
-        if args.write:
+        key = None
+        while not args.confirm and key not in ['y', 'n']:
+            key = input("Write to device? [y/n]: ")
+        if not args.confirm and key == 'n':
+            sys.exit()
+        else:
+            print("Writing to device...")
             tm2 = None
             print(dev)
             if not dev:
