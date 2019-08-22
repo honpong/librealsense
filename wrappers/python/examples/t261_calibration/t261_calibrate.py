@@ -339,7 +339,7 @@ def calibrate_observations(camera_name, K0, D0):
         print("K:", K)
         print("D:", np.array2string(D, separator=', '))
 
-    save_poses(tmp_folder + 'poses_' + camera_name + ".txt", rvec, tvec)
+    #save_poses(tmp_folder + 'poses_' + camera_name + ".txt", rvec, tvec)
 
     (_, _, support) = evaluate_calibration(camera_name, inlier_object, inlier_image, None, rvec, tvec, K, Dguess)
 
@@ -415,20 +415,19 @@ if __name__ == "__main__":
     parser.add_argument('--path', default=".", help='calibration output path')
     parser.add_argument('--images', help='image folder input path')
     parser.add_argument('--extrinsics', default=False, help='calibrate extrinsics', action='store_true')
+    parser.add_argument('--write', default=False, help='write calibration to device', action='store_true')
     args = parser.parse_args()
     tmp_folder = "tmp"
 
     try:
 
+        dev = None
         if args.images:
             sn = "playback"
-        else:
+        #else:
             pipe = rs.pipeline()
-            pipe.start()
-
-            # Retreive serial number and internal calibration
-            profiles = pipe.get_active_profile()
-            dev = profiles.get_device()
+            profile = pipe.start()
+            dev = profile.get_device()
             sn = dev.get_info(rs.camera_info.serial_number)
 
         print("Serial number:", sn)
@@ -519,7 +518,7 @@ if __name__ == "__main__":
         save_calibration(args.path, sn, K1, D1, K2, D2)
 
         f = open(tmp_folder + 'rmse.txt','w')
-        np.savetxt(f, np.array([rms1, rms2]).reshape(1,2))
+        #np.savetxt(f, np.array([rms1, rms2]).reshape(1,2))
         f.close()
 
         if args.extrinsics:
@@ -528,7 +527,34 @@ if __name__ == "__main__":
             print("Left fisheye w.r.t. right")
             print("R_fe2_fe1:", R_fe2_fe1)
             print("T_fe2_fe1:", T_fe2_fe1)
-            save_extrinsics(args.path + "/H_fe2_fe1.txt", R_fe2_fe1, T_fe2_fe1)
+            #save_extrinsics(args.path + "/H_fe2_fe1.txt", R_fe2_fe1, T_fe2_fe1)
+
+        if args.write:
+            tm2 = None
+            print(dev)
+            if not dev:
+                ctx = rs.context()
+                devs = ctx.query_devices()
+                print(len(devs))
+                devs = ctx.query_devices()
+                print(len(devs))
+                for dev in devs:
+                    tm2 = dev.as_tm2()
+            else:
+                tm2 = dev.as_tm2()
+            print(tm2)
+
+            if tm2:
+                fe_intrinsics = rs.intrinsics()
+                fe_intrinsics.fx = K1[0,0]
+                tm2.set_intrinsics(1, fe_intrinsics)
+
+                fe_intrinsics = rs.intrinsics()
+                fe_intrinsics.fx = K2[0,0]
+                tm2.set_intrinsics(2, fe_intrinsics)
+
+                tm2.write_calibration()
+
 
     finally:
         if not args.images:
