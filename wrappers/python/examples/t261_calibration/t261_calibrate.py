@@ -38,7 +38,7 @@ import transformations as tf
 
 
 # Enable this for more verbose printing
-debug = True
+debug = False
 
 """
 This example uses a ChArUco target and the parameters of it are
