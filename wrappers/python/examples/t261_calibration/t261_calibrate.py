@@ -67,7 +67,7 @@ board = cv2.aruco.CharucoBoard_create(board_width, board_height, checker_size_m,
 parameters = cv2.aruco.DetectorParameters_create()
 
 # detection parameters
-min_detections = 5
+min_detections = 10
 n_stereo_matches = 15
 
 # OpenCV fisheye calibration parameters
