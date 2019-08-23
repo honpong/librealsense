@@ -201,20 +201,58 @@ def add_camera_calibration(K, D):
     cam['distortion']['type'] = 'kannalabrandt4'
     return cam
 
-def save_calibration(directory, sn, K1, D1, K2, D2):
+def override_camera_calibration(cam, K, D, H = None):
+    cam['center_px'] = [K[0,2], K[1,2]]
+    cam['focal_length_px'] = [K[0,0], K[1,1]]
+
+    cam['distortion'] = OrderedDict(sorted(cam['distortion'].items()))
+    cam['distortion']['k'] = D.flatten().tolist()
+
+    cam['extrinsics'] = OrderedDict(sorted(cam['extrinsics'].items()))
+    if H is not None:
+        cam['extrinsics']['T'] = H[:3,3].tolist()
+        [theta,u,_] = tf.rotation_from_matrix(H)
+        cam['extrinsics']['W'] = (theta*u).tolist()
+
+    return OrderedDict(sorted(cam.items()))
+
+def save_calibration(directory, calib, K1, D1, K2, D2, H_1_2 = None):
     # This will be converted to use librealsense API to write to
     # T261 eeprom
-    calib = OrderedDict()  # in order (cam1,cam2)
-    calib['device_id'] = sn
-    calib['device_type'] = ""
-    calib['calibration_version'] = 10  # do not change
-    calib['cameras'] = []
-    calib['cameras'].append( add_camera_calibration(K1,D1) )
-    calib['cameras'].append( add_camera_calibration(K2,D2) )
+    #calib = OrderedDict()  # in order (cam1,cam2)
+    #calib['device_id'] = sn
+    #calib['device_type'] = ""
+    #calib['calibration_version'] = 10  # do not change
+    #calib['cameras'] = []
+
+    # transformation
+    H_p_1 = None
+    H_p_2 = None
+    if H_1_2 is not None:
+        [theta,u,_] = tf.rotation_from_matrix(H_1_2)
+        print(theta)
+        t_1_2 = H_1_2[:3,3]
+        print(t_1_2)
+
+        H_1_c = tf.rotation_matrix(theta/2, u)
+        H_1_c[:3,3] = t_1_2/2
+        H_c_1 = np.linalg.inv(H_1_c)
+
+        H_c_p = np.eye(4)
+        H_c_p[1,1] = -1
+        H_c_p[2,2] = -1
+        H_p_c = np.linalg.inv(H_c_p)
+        H_p_1 = H_p_c.dot( H_c_1 )
+
+        H_p_2 = H_p_1.dot( H_1_2 )
+
+    calib['cameras'][0] = override_camera_calibration(calib['cameras'][0], K1, D1, H_p_1)
+    calib['cameras'][1] = override_camera_calibration(calib['cameras'][1], K2, D2, H_p_2)
 
     if not os.path.exists(directory):
         os.mkdir(directory)
-    fn = directory + '/cam' + str(sn) + '_intrinsics.json'
+    fn = directory + '/cam' + args.sn[-4:] +  '_oem.json'
+    calib = OrderedDict(sorted(calib.items()))
     with open(fn, 'w') as f:
         json.dump(calib, f, indent=4)
     print("Calibration written to", fn)
@@ -616,13 +654,7 @@ if __name__ == "__main__":
         if not args.skip_check:
             check_calibration(rms1, rms2, support1, support2)
 
-        # save calibration to file
-        save_calibration(args.path, sn, K1, D1, K2, D2)
-
-        f = open(tmp_folder + 'rmse.txt','w')
-        #np.savetxt(f, np.array([rms1, rms2]).reshape(1,2))
-        f.close()
-
+        H_fe1_fe2 = None
         if args.extrinsics:
             print("\nStereo calibration")
             (rms, R_fe2_fe1, T_fe2_fe1) = calibrate_extrinsics(observations, K1, D1, K2, D2)  # cam1 w.r.t. cam2
@@ -630,6 +662,19 @@ if __name__ == "__main__":
             print("R_fe2_fe1:", R_fe2_fe1)
             print("T_fe2_fe1:", T_fe2_fe1)
             #save_extrinsics(args.path + "/H_fe2_fe1.txt", R_fe2_fe1, T_fe2_fe1)
+
+            H_fe2_fe1 = np.eye(4)
+            H_fe2_fe1[:3,:3] = R_fe2_fe1
+            H_fe2_fe1[:3,3] = T_fe2_fe1.flatten()
+            H_fe1_fe2 = np.linalg.inv(H_fe2_fe1)
+
+        # save calibration to file
+        #save_calibration(args.path, sn, K1, D1, K2, D2)
+        save_calibration(args.path, d_calib, K1, D1, K2, D2, H_fe1_fe2)
+
+        f = open(tmp_folder + 'rmse.txt','w')
+        #np.savetxt(f, np.array([rms1, rms2]).reshape(1,2))
+        f.close()
 
         # write to device
         if args.write:
