@@ -38,7 +38,7 @@ import transformations as tf
 
 
 # Enable this for more verbose printing
-debug = False
+debug = True
 
 """
 This example uses a ChArUco target and the parameters of it are
@@ -74,6 +74,7 @@ n_stereo_matches = 15
 flags = cv2.fisheye.CALIB_FIX_SKEW                      # Fix the skew of K to 0
 flags = flags | cv2.fisheye.CALIB_USE_INTRINSIC_GUESS   # Use a guess for the camera matrix
 flags = flags | cv2.fisheye.CALIB_RECOMPUTE_EXTRINSIC   # Recompute the relative poses of the target each time
+#flags = flags | cv2.fisheye.CALIB_FIX_PRINCIPAL_POINT
 criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 5000, 1e-9)
 
 
@@ -205,7 +206,7 @@ def save_calibration(directory, sn, K1, D1, K2, D2):
 
     if not os.path.exists(directory):
         os.mkdir(directory)
-    fn = directory + '/cam_' + str(sn) + '_intrinsics.json'
+    fn = directory + '/cam' + str(sn) + '_intrinsics.json'
     with open(fn, 'w') as f:
         json.dump(calib, f, indent=4)
     print("Calibration written to", fn)
@@ -337,7 +338,7 @@ def calibrate_observations(camera_name, K0, D0):
                                                      flags = final_flags,
                                                      criteria = criteria)
     if debug:
-        print("rmse", rmse)
+        print("refined rmse", rmse)
         print("K:", K)
         print("D:", np.array2string(D, separator=', '))
 
@@ -412,7 +413,7 @@ def calibrate_extrinsics(observations, K1, D1, K2, D2):
     return (rms, R, T)
 
 def validate_calibration(rms1, rms2, support1, support2):
-    rms_thresh = 0.5*2
+    rms_thresh = 0.5
     min_support = 350*0.5
     failed = False
     print()
@@ -477,9 +478,11 @@ if __name__ == "__main__":
     parser.add_argument('--path', default=".", help='calibration output path')
     parser.add_argument('--images', help='image folder input path')
     parser.add_argument('--extrinsics', default=False, help='calibrate extrinsics', action='store_true')
-    parser.add_argument('--confirm', default=False, help='write calibration to device (w/o prompt)', action='store_true')
+    parser.add_argument('--write', default=False, help='write calibration to device', action='store_true')
+    parser.add_argument('--confirm', default=False, help='turn off prompt when writing', action='store_true')
     parser.add_argument('--reset', default=False, help='reset calibration to factory default', action='store_true')
     parser.add_argument('--read', default=False, help='reset calibration to factory default', action='store_true')
+    parser.add_argument('--sn', help='set serial number')
     args = parser.parse_args()
     tmp_folder = "tmp"
 
@@ -493,13 +496,15 @@ if __name__ == "__main__":
 
     try:
         dev = None
-        if args.images:
-            sn = "playback"
-        else:
+        sn = ""
+        if not args.images:
             pipe = rs.pipeline()
             profile = pipe.start()
             dev = profile.get_device()
             sn = dev.get_info(rs.camera_info.serial_number)
+
+        if args.sn:
+            sn = args.sn
 
         print("Serial number:", sn)
         tmp_folder = tmp_folder + "/cam_" + sn + "/"
@@ -596,7 +601,7 @@ if __name__ == "__main__":
         save_calibration(args.path, sn, K1, D1, K2, D2)
 
         f = open(tmp_folder + 'rmse.txt','w')
-        np.savetxt(f, np.array([rms1, rms2]).reshape(1,2))
+        #np.savetxt(f, np.array([rms1, rms2]).reshape(1,2))
         f.close()
 
         if args.extrinsics:
@@ -608,33 +613,34 @@ if __name__ == "__main__":
             #save_extrinsics(args.path + "/H_fe2_fe1.txt", R_fe2_fe1, T_fe2_fe1)
 
         # write to device
-        print()
-        while key not in ['y', 'n'] and not args.confirm:
-            key = input("Write to device? [y/n]: ")
-        if key == 'n' and not args.confirm:
-            sys.exit()
-        else:
-            tm2 = None
-            if not dev:
-                ctx = rs.context()
-                devs = ctx.query_devices()
-                for dev in devs:
+        if args.write:
+            print()
+            while key not in ['y', 'n'] and not args.confirm:
+                key = input("Write to device? [y/n]: ")
+            if key == 'n' and not args.confirm:
+                sys.exit()
+            else:
+                tm2 = None
+                if not dev:
+                    ctx = rs.context()
+                    devs = ctx.query_devices()
+                    for dev in devs:
+                        tm2 = dev.as_tm2()
+                else:
                     tm2 = dev.as_tm2()
-            else:
-                tm2 = dev.as_tm2()
 
-            if not tm2:
-                print("No T261 found")
-            else:
-                print("Writing to device...")
-                fe_intrinsics = lrs_intrinsics(K1, D1)
-                tm2.set_intrinsics(1, fe_intrinsics)
+                if not tm2:
+                    print("No T261 found")
+                else:
+                    print("Writing to device...")
+                    fe_intrinsics = lrs_intrinsics(K1, D1)
+                    tm2.set_intrinsics(1, fe_intrinsics)
 
-                fe_intrinsics = lrs_intrinsics(K2, D2)
-                tm2.set_intrinsics(2, fe_intrinsics)
+                    fe_intrinsics = lrs_intrinsics(K2, D2)
+                    tm2.set_intrinsics(2, fe_intrinsics)
 
-                tm2.write_calibration()
-                print("Finished")
+                    tm2.write_calibration()
+                    print("Finished")
 
 
     finally:
