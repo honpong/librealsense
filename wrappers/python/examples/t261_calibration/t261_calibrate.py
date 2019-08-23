@@ -216,6 +216,25 @@ def override_camera_calibration(cam, K, D, H = None):
 
     return OrderedDict(sorted(cam.items()))
 
+def center_transformation(H_1_2):
+    [theta,u,_] = tf.rotation_from_matrix(H_1_2)
+    t_1_2 = H_1_2[:3,3]
+
+    H_1_c = tf.rotation_matrix(theta/2, u)
+    H_1_c[:3,3] = t_1_2/2
+    H_c_1 = np.linalg.inv(H_1_c)
+
+    H_c_p = np.eye(4)
+    # VR coord.: pose frame w.r.t. cam (center)
+    H_c_p[1,1] = -1
+    H_c_p[2,2] = -1
+    H_p_c = np.linalg.inv(H_c_p)
+
+    H_p_1 = H_p_c.dot( H_c_1 )
+    H_p_2 = H_p_1.dot( H_1_2 )
+
+    return (H_p_1, H_p_2)
+
 def save_calibration(directory, calib, K1, D1, K2, D2, H_1_2 = None):
     # This will be converted to use librealsense API to write to
     # T261 eeprom
@@ -229,22 +248,7 @@ def save_calibration(directory, calib, K1, D1, K2, D2, H_1_2 = None):
     H_p_1 = None
     H_p_2 = None
     if H_1_2 is not None:
-        [theta,u,_] = tf.rotation_from_matrix(H_1_2)
-        print(theta)
-        t_1_2 = H_1_2[:3,3]
-        print(t_1_2)
-
-        H_1_c = tf.rotation_matrix(theta/2, u)
-        H_1_c[:3,3] = t_1_2/2
-        H_c_1 = np.linalg.inv(H_1_c)
-
-        H_c_p = np.eye(4)
-        H_c_p[1,1] = -1
-        H_c_p[2,2] = -1
-        H_p_c = np.linalg.inv(H_c_p)
-        H_p_1 = H_p_c.dot( H_c_1 )
-
-        H_p_2 = H_p_1.dot( H_1_2 )
+        (H_p_1, H_p_2) = center_transformation(H_1_2)
 
     calib['cameras'][0] = override_camera_calibration(calib['cameras'][0], K1, D1, H_p_1)
     calib['cameras'][1] = override_camera_calibration(calib['cameras'][1], K2, D2, H_p_2)
@@ -256,6 +260,21 @@ def save_calibration(directory, calib, K1, D1, K2, D2, H_1_2 = None):
     with open(fn, 'w') as f:
         json.dump(calib, f, indent=4)
     print("Calibration written to", fn)
+
+def lrs_extrinsics(H):
+    R = H[:3,:3]
+    t = H[:3,3]
+    ext = rs.extrinsics()
+    ext.rotation = R.flatten().tolist()
+    ext.translation = t.tolist()
+    return ext 
+
+def write_extrinsics(tm2, H_1_2):
+    (H_p_1, H_p_2) = center_transformation(H_1_2)
+    ext_fe1 = lrs_extrinsics(H_p_1)
+    ext_fe2 = lrs_extrinsics(H_p_2)
+    tm2.set_extrinsics(rs.stream.fisheye, 1, ext_fe1)
+    tm2.set_extrinsics(rs.stream.fisheye, 2, ext_fe2)
 
 def save_extrinsics(filename, R, T):
     H = np.eye(4)
@@ -514,10 +533,14 @@ def read_calibration():
         sensors = tm2.query_sensors()
         for sensor in sensors:
             profiles = sensor.get_stream_profiles()
+            video_profiles = []
             for profile in profiles:
                 if profile.is_video_stream_profile():
                     vp = profile.as_video_stream_profile()
                     print(vp.get_intrinsics())
+                    video_profiles.append(vp)
+            print("Fisheye 2 w.r.t. fisheye 1:")
+            print(video_profiles[1].get_extrinsics_to(video_profiles[0]))
 
 
 if __name__ == "__main__":
@@ -703,7 +726,12 @@ if __name__ == "__main__":
                     fe_intrinsics = lrs_intrinsics(K2, D2)
                     tm2.set_intrinsics(2, fe_intrinsics)
 
+                    # extrinsics
+                    write_extrinsics(tm2, H_fe1_fe2)
+
+                    # flush to eeprom
                     tm2.write_calibration()
+
                     print("Finished")
 
 
