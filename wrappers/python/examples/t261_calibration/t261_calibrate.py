@@ -205,8 +205,10 @@ def save_calibration(directory, sn, K1, D1, K2, D2):
 
     if not os.path.exists(directory):
         os.mkdir(directory)
-    with open(directory + '/cam_' + str(sn) + '_intrinsics.json', 'w') as f:
+    fn = directory + '/cam_' + str(sn) + '_intrinsics.json'
+    with open(fn, 'w') as f:
         json.dump(calib, f, indent=4)
+    print("Calibration written to", fn)
 
 def save_extrinsics(filename, R, T):
     H = np.eye(4)
@@ -541,10 +543,14 @@ if __name__ == "__main__":
                 f2 = frameset.get_fisheye_frame(2).as_video_frame()
                 stereo_pair = (np.asanyarray(f1.get_data()), np.asanyarray(f2.get_data()))
 
-            # display (for visual alignment)
+            # display images
             stereo_horizontal = np.hstack((stereo_pair[0], stereo_pair[1]))
             cv2.namedWindow('Stereo fisheye', cv2.WINDOW_NORMAL)
             cv2.resizeWindow('Stereo fisheye', 848*2,800)
+            #cv2.putText(stereo_horizontal, "Press 's' to acquire image", (0,0), cv2.FONT_HERSHEY_SIMPLEX)
+            cv2.putText(stereo_horizontal, "Press 's' to acquire images (%d)" % n_frame, (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 1, cv2.LINE_AA)
+            cv2.putText(stereo_horizontal, "Press 'c' to calibrate", (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 1, cv2.LINE_AA)
+            cv2.putText(stereo_horizontal, "Press 'q' to quit", (50, 150), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 1, cv2.LINE_AA)
             cv2.imshow("Stereo fisheye", stereo_horizontal)
             key = cv2.waitKey(1)
 
@@ -586,10 +592,11 @@ if __name__ == "__main__":
         # validation step
         validate_calibration(rms1, rms2, support1, support2)
 
+        # save calibration to file
         save_calibration(args.path, sn, K1, D1, K2, D2)
 
         f = open(tmp_folder + 'rmse.txt','w')
-        #np.savetxt(f, np.array([rms1, rms2]).reshape(1,2))
+        np.savetxt(f, np.array([rms1, rms2]).reshape(1,2))
         f.close()
 
         if args.extrinsics:
