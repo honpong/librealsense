@@ -74,7 +74,7 @@ n_stereo_matches = 15
 flags = cv2.fisheye.CALIB_FIX_SKEW                      # Fix the skew of K to 0
 flags = flags | cv2.fisheye.CALIB_USE_INTRINSIC_GUESS   # Use a guess for the camera matrix
 flags = flags | cv2.fisheye.CALIB_RECOMPUTE_EXTRINSIC   # Recompute the relative poses of the target each time
-#flags = flags | cv2.fisheye.CALIB_FIX_PRINCIPAL_POINT
+flags = flags | cv2.fisheye.CALIB_FIX_PRINCIPAL_POINT
 criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 5000, 1e-9)
 
 
@@ -95,6 +95,14 @@ def camera_matrix(intrinsics):
     return np.array([[intrinsics.fx,             0, intrinsics.ppx],
                      [            0, intrinsics.fy, intrinsics.ppy],
                      [            0,             0,              1]])
+
+def camera_matrix_from_dict(d_cam):
+    K = np.eye(3)
+    K[0,0] = d_cam['focal_length_px'][0]
+    K[1,1] = d_cam['focal_length_px'][1]
+    K[0,2] = d_cam['center_px'][0]
+    K[1,2] = d_cam['center_px'][1]
+    return K
 
 # Returns the kb4 distortion coefficients
 def fisheye_distortion(intrinsics):
@@ -305,10 +313,11 @@ def calibrate_observations(camera_name, K0, D0):
         identification.append(ids)
     # mean distortion
     Dguess = np.array([-0.00626438, 0.0493399, -0.0463255, 0.00896666])
-    Kguess = np.zeros((3,3))
-    Kguess[0][0] = Kguess[1][1] = 285
-    Kguess[0][2] = image_size[0]/2
-    Kguess[1][2] = image_size[1]/2
+    #Kguess = np.zeros((3,3))
+    #Kguess[0][0] = Kguess[1][1] = 285
+    #Kguess[0][2] = image_size[0]/2
+    #Kguess[1][2] = image_size[1]/2
+    Kguess = K0
 
     initial_flags = flags
     (rmse, K, D, rvec, tvec) = cv2.fisheye.calibrate(objectPoints = object_points,
@@ -413,8 +422,8 @@ def calibrate_extrinsics(observations, K1, D1, K2, D2):
     return (rms, R, T)
 
 def validate_calibration(rms1, rms2, support1, support2):
-    rms_thresh = 0.5
-    min_support = 350*0.5
+    rms_thresh = 0.5*2
+    min_support = 300 #350
     failed = False
     print()
     if rms1 > rms_thresh or rms2 > rms_thresh:
@@ -526,8 +535,16 @@ if __name__ == "__main__":
             D0r = fisheye_distortion(intrinsics[1])
             (width, height) = (intrinsics[0].width, intrinsics[0].height)
         else:
-            K0l = K0r = np.eye(3)
-            D0l = D0r = np.array((4,1))
+            # from dictionary
+            with open(args.images + "cam" + sn + ".json", "r") as f:
+                d_calib = json.load(f)
+                print(d_calib)
+                K0l = camera_matrix_from_dict(d_calib['cameras'][0])
+                K0r = camera_matrix_from_dict(d_calib['cameras'][1])
+                print(K0l)
+                print(K0r)
+                D0l = D0r = np.array((4,1))
+
 
         n_frame = 0
         frame_index = 0
