@@ -421,7 +421,7 @@ def calibrate_extrinsics(observations, K1, D1, K2, D2):
 
     return (rms, R, T)
 
-def validate_calibration(rms1, rms2, support1, support2):
+def check_calibration(rms1, rms2, support1, support2):
     rms_thresh = 0.5
     min_support = 350
     failed = False
@@ -492,6 +492,7 @@ if __name__ == "__main__":
     parser.add_argument('--reset', default=False, help='reset calibration to factory default', action='store_true')
     parser.add_argument('--read', default=False, help='reset calibration to factory default', action='store_true')
     parser.add_argument('--sn', help='set serial number')
+    parser.add_argument('--skip-check', default=False, help='check basic pass criteria of calibration', action='store_true')
     args = parser.parse_args()
     tmp_folder = "tmp"
 
@@ -611,8 +612,9 @@ if __name__ == "__main__":
         print("Left image support region [px]:", support1)
         print("Right image support region [px]:", support2)
 
-        # validation step
-        validate_calibration(rms1, rms2, support1, support2)
+        # check basic pass criteria
+        if not args.skip_check:
+            check_calibration(rms1, rms2, support1, support2)
 
         # save calibration to file
         save_calibration(args.path, sn, K1, D1, K2, D2)
