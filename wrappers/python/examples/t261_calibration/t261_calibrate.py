@@ -201,21 +201,6 @@ def add_camera_calibration(K, D):
     cam['distortion']['type'] = 'kannalabrandt4'
     return cam
 
-def override_camera_calibration(cam, K, D, H = None):
-    cam['center_px'] = [K[0,2], K[1,2]]
-    cam['focal_length_px'] = [K[0,0], K[1,1]]
-
-    cam['distortion'] = OrderedDict(sorted(cam['distortion'].items()))
-    cam['distortion']['k'] = D.flatten().tolist()
-
-    cam['extrinsics'] = OrderedDict(sorted(cam['extrinsics'].items()))
-    if H is not None:
-        cam['extrinsics']['T'] = H[:3,3].tolist()
-        [theta,u,_] = tf.rotation_from_matrix(H)
-        cam['extrinsics']['W'] = (theta*u).tolist()
-
-    return OrderedDict(sorted(cam.items()))
-
 def center_transformation(H_1_2):
     [theta,u,_] = tf.rotation_from_matrix(H_1_2)
     t_1_2 = H_1_2[:3,3]
@@ -235,16 +220,22 @@ def center_transformation(H_1_2):
 
     return (H_p_1, H_p_2)
 
-def save_calibration(directory, calib, K1, D1, K2, D2, H_1_2 = None):
-    # This will be converted to use librealsense API to write to
-    # T261 eeprom
-    #calib = OrderedDict()  # in order (cam1,cam2)
-    #calib['device_id'] = sn
-    #calib['device_type'] = ""
-    #calib['calibration_version'] = 10  # do not change
-    #calib['cameras'] = []
+def override_camera_calibration(cam, K, D, H = None):
+    cam['center_px'] = [K[0,2], K[1,2]]
+    cam['focal_length_px'] = [K[0,0], K[1,1]]
 
-    # transformation
+    cam['distortion'] = OrderedDict(sorted(cam['distortion'].items()))  # sort for line by line comparison
+    cam['distortion']['k'] = D.flatten().tolist()
+
+    cam['extrinsics'] = OrderedDict(sorted(cam['extrinsics'].items()))
+    if H is not None:
+        cam['extrinsics']['T'] = H[:3,3].tolist()
+        [theta,u,_] = tf.rotation_from_matrix(H)
+        cam['extrinsics']['W'] = (theta*u).tolist()
+
+    return OrderedDict(sorted(cam.items()))
+
+def override_calibration(directory, calib, K1, D1, K2, D2, H_1_2 = None):
     H_p_1 = None
     H_p_2 = None
     if H_1_2 is not None:
@@ -255,8 +246,24 @@ def save_calibration(directory, calib, K1, D1, K2, D2, H_1_2 = None):
 
     if not os.path.exists(directory):
         os.mkdir(directory)
-    fn = directory + '/cam' + args.sn[-4:] +  '_oem.json'
-    calib = OrderedDict(sorted(calib.items()))
+    fn = directory + '/cam' + sn[-4:] +  '_oem.json'
+    d_calib = OrderedDict(sorted(calib.items()))  # sort for line-by-line comparison
+    with open(fn, 'w') as f:
+        json.dump(calib, f, indent=4)
+    print("Calibration written to", fn)
+
+def save_calibration(directory, sn, K1, D1, K2, D2):
+    calib = OrderedDict()  # in order (cam1,cam2)
+    calib['device_id'] = sn
+    calib['device_type'] = ""
+    calib['calibration_version'] = 10  # do not change
+    calib['cameras'] = []
+    calib['cameras'].append( add_camera_calibration(K1,D1) )
+    calib['cameras'].append( add_camera_calibration(K2,D2) )
+
+    if not os.path.exists(directory):
+        os.mkdir(directory)
+    fn = directory + '/cam' + sn[-4:] + '_intrinsics.json'
     with open(fn, 'w') as f:
         json.dump(calib, f, indent=4)
     print("Calibration written to", fn)
@@ -368,13 +375,14 @@ def calibrate_observations(camera_name, K0, D0):
         object_points.append(obj_i)
         image_points.append(img_i)
         identification.append(ids)
-    # mean distortion
-    Dguess = np.array([-0.00626438, 0.0493399, -0.0463255, 0.00896666])
-    #Kguess = np.zeros((3,3))
-    #Kguess[0][0] = Kguess[1][1] = 285
-    #Kguess[0][2] = image_size[0]/2
-    #Kguess[1][2] = image_size[1]/2
-    Kguess = K0
+    Dguess = np.array([-0.00626438, 0.0493399, -0.0463255, 0.00896666])  # mean distortion
+    if K0 is not None:
+        Kguess = K0
+    else:
+        Kguess = np.eye(3)
+        Kguess[0][0] = Kguess[1][1] = 285
+        Kguess[0][2] = image_size[0]/2
+        Kguess[1][2] = image_size[1]/2
 
     initial_flags = flags
     (rmse, K, D, rvec, tvec) = cv2.fisheye.calibrate(objectPoints = object_points,
@@ -549,25 +557,22 @@ if __name__ == "__main__":
     parser.add_argument('--images', help='image folder input path')
     parser.add_argument('--extrinsics', default=False, help='calibrate extrinsics', action='store_true')
     parser.add_argument('--write', default=False, help='write calibration to device', action='store_true')
-    parser.add_argument('--confirm', default=False, help='turn off prompt when writing', action='store_true')
+    parser.add_argument('--confirm', default=False, help='skip write prompt', action='store_true')
     parser.add_argument('--reset', default=False, help='reset calibration to factory default', action='store_true')
-    parser.add_argument('--read', default=False, help='reset calibration to factory default', action='store_true')
+    parser.add_argument('--skip_check', default=False, help='skip calibration check', action='store_true')
     parser.add_argument('--sn', help='set serial number')
-    parser.add_argument('--skip-check', default=False, help='check basic pass criteria of calibration', action='store_true')
     args = parser.parse_args()
-    tmp_folder = "tmp"
 
+    tmp_folder = "tmp"  # temporary folder to store debug output
+
+    # utility function to reset calibration to factory calibration
     if args.reset:
         reset_calibration()
         sys.exit()
 
-    if args.read:
-        read_calibration()
-        sys.exit()
-
     try:
         dev = None
-        sn = ""
+        sn = "XXXX"
         if not args.images:
             pipe = rs.pipeline()
             profile = pipe.start()
@@ -581,6 +586,8 @@ if __name__ == "__main__":
         tmp_folder = tmp_folder + "/cam_" + sn + "/"
         ensure_path(tmp_folder)
 
+        d_calib = None
+        K0l = K0r = D0l = D0r = None
         if not args.images:
             streams = (
                 profile.get_stream(rs.stream.fisheye, 1).as_video_stream_profile(),
@@ -597,19 +604,19 @@ if __name__ == "__main__":
             D0r = fisheye_distortion(intrinsics[1])
             (width, height) = (intrinsics[0].width, intrinsics[0].height)
         else:
-            # from dictionary
-            with open(args.images + "cam" + sn + ".json", "r") as f:
-                d_calib = json.load(f)
-                print(d_calib)
-                K0l = camera_matrix_from_dict(d_calib['cameras'][0])
-                K0r = camera_matrix_from_dict(d_calib['cameras'][1])
-                print(K0l)
-                print(K0r)
-                D0l = D0r = np.array((4,1))
+            # from calibration file (in image folder)
+            fn = args.images + "calibration.json"
+            if os.path.exists(fn):
+                with open(fn, "r") as f:
+                    d_calib = json.load(f)
+                    K0l = camera_matrix_from_dict(d_calib['cameras'][0])
+                    K0r = camera_matrix_from_dict(d_calib['cameras'][1])
+                    D0l = D0r = np.array((4,1))
 
 
         n_frame = 0
         frame_index = 0
+        # main loop
         while True:
             if args.images:
                 left = cv2.imread("%s/fe1_%03d.png" % (args.images, frame_index))
@@ -631,7 +638,6 @@ if __name__ == "__main__":
             stereo_horizontal = np.hstack((stereo_pair[0], stereo_pair[1]))
             cv2.namedWindow('Stereo fisheye', cv2.WINDOW_NORMAL)
             cv2.resizeWindow('Stereo fisheye', 848*2,800)
-            #cv2.putText(stereo_horizontal, "Press 's' to acquire image", (0,0), cv2.FONT_HERSHEY_SIMPLEX)
             cv2.putText(stereo_horizontal, "Press 's' to acquire images (%d)" % n_frame, (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 1, cv2.LINE_AA)
             cv2.putText(stereo_horizontal, "Press 'c' to calibrate", (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 1, cv2.LINE_AA)
             cv2.putText(stereo_horizontal, "Press 'q' to quit", (50, 150), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 1, cv2.LINE_AA)
@@ -692,12 +698,14 @@ if __name__ == "__main__":
             H_fe1_fe2 = np.linalg.inv(H_fe2_fe1)
 
         # save calibration to file
-        #save_calibration(args.path, sn, K1, D1, K2, D2)
-        save_calibration(args.path, d_calib, K1, D1, K2, D2, H_fe1_fe2)
+        if d_calib:
+            override_calibration(args.path, d_calib, K1, D1, K2, D2, H_fe1_fe2)
+        else:
+            save_calibration(args.path, sn, K1, D1, K2, D2)
 
-        f = open(tmp_folder + 'rmse.txt','w')
+        #f = open(tmp_folder + 'rmse.txt','w')
         #np.savetxt(f, np.array([rms1, rms2]).reshape(1,2))
-        f.close()
+        #f.close()
 
         # write to device
         if args.write:
@@ -727,7 +735,8 @@ if __name__ == "__main__":
                     tm2.set_intrinsics(2, fe_intrinsics)
 
                     # extrinsics
-                    write_extrinsics(tm2, H_fe1_fe2)
+                    if args.extrinsics and H_fe1_fe2 is not None:
+                        write_extrinsics(tm2, H_fe1_fe2)
 
                     # flush to eeprom
                     tm2.write_calibration()
