@@ -280,8 +280,8 @@ def write_extrinsics(tm2, H_1_2):
     (H_p_1, H_p_2) = center_transformation(H_1_2)
     ext_fe1 = lrs_extrinsics(H_p_1)
     ext_fe2 = lrs_extrinsics(H_p_2)
-    tm2.set_extrinsics(rs.stream.fisheye, 1, ext_fe1)
-    tm2.set_extrinsics(rs.stream.fisheye, 2, ext_fe2)
+    tm2.set_extrinsics(rs.stream.fisheye, 1, rs.stream.pose, 0, ext_fe1)
+    tm2.set_extrinsics(rs.stream.fisheye, 2, rs.stream.pose, 0, ext_fe2)
 
 def save_extrinsics(filename, R, T):
     H = np.eye(4)
