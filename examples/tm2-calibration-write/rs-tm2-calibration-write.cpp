@@ -92,10 +92,10 @@ bool test_write_oem_calibration()
     rs2::context ctx;
     for (auto dev : ctx.query_devices()) {
         if (auto tm2 = dev.as<rs2::tm2>()) {
-            rs2_intrinsics fisheye_intrinsics[2] = {};
+            rs2_intrinsics fisheye_intrinsics[2] = { {1,2,3,4,5}, {6,7,8,9,10} };
             rs2_extrinsics fisheye_extrinsics[2] = {};
-            rs2_motion_device_intrinsic motion_intrinsics[2] = {};
-
+            rs2_motion_device_intrinsic motion_intrinsics[2] = { {1,2,3,4,5,6,7,8,9},{11,12,13,14,15,16,17,18,19} };
+            
             // set calibration data into the device's virtual table
             for (auto sensor_id : { 1,2 }) {
                 tm2.set_intrinsics(sensor_id, fisheye_intrinsics[sensor_id - 1]);
