@@ -9,7 +9,7 @@ This python sample supports the basic functionality of capturing N stereo image 
 ## Setup
 
 ### Hardware
-* Calibration target: The calibration process requires a ChAruCo target (10x16) printed on a rigid surface of approximately the size of a US letter or A4 at 100% scale. (Please check printer settings which might be different from default!)
+* Calibration target: The calibration process requires a [ChAruCo target (10x16)](calib.io_charuco_297x210_10x16_15_DICT_4X4.pdf) printed on a rigid surface of approximately the size of a US letter or A4 at 100% scale. (Please check printer settings which might be different from default!)
 
 * Lighting: Sufficient and uniform lighting and a uniform background (that can cover up to around half of the field of view) are important for good and repeatable calibration results.
 
@@ -17,7 +17,25 @@ This python sample supports the basic functionality of capturing N stereo image 
 
 
 ### Software
-Please follow the installation instructions at the start of the python script.
+On Ubuntu 16.04 (tested), please follow the installation instructions below.
+
+First, set up the virtual enviroment:
+```
+apt-get install python3-venv # install python3 built in venv support
+python3 -m venv py3librs # create a virtual environment in pylibrs
+source py3librs/bin/activate # activate the venv, do this from every terminal
+pip install -i https://test.pypi.org/simple/ pyrealsense2==2.27.0.1062 # install librealsense python bindings, current development branch with LRS T261 calibration changes, to be updated after release (pip install pyrealsense2)
+pip install opencv-python # install opencv 4.1 in the venv
+pip install opencv-contrib-python # install opencv extra modules including aruco
+pip install transformations # install transformations in the venv
+pip install matplotlib # install matplotlib in the venv, used for debug plots
+```
+
+Then, for every new terminal:
+```
+source py3librs/bin/activate # Activate the virtual environment
+python3 t265_aruco.py # Run the example
+```
 
 ## Running the T261 calibration sample
 
