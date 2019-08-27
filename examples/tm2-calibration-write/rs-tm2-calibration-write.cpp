@@ -99,12 +99,12 @@ bool test_write_oem_calibration()
             // set calibration data into the device's virtual table
             for (auto sensor_id : { 1,2 }) {
                 tm2.set_intrinsics(sensor_id, fisheye_intrinsics[sensor_id - 1]);
-                tm2.set_extrinsics(RS2_STREAM_FISHEYE, sensor_id, RS2_STREAM_POSE, 0, fisheye_extrinsics[sensor_id - 1]);
             }
             for (auto imu : { RS2_STREAM_GYRO, RS2_STREAM_ACCEL }) {
                 tm2.set_motion_device_intrinsics(imu, motion_intrinsics[imu - RS2_STREAM_GYRO]);
             }
 
+            tm2.set_extrinsics(RS2_STREAM_FISHEYE, 1, RS2_STREAM_FISHEYE, 2, rs2_extrinsics{1,0,0,0,1,0,0,0,1,0,0,0});
             tm2.write_calibration(); //write new calibration data into EEPROM
         }
         return true;
