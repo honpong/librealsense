@@ -37,6 +37,7 @@ The possible command line options are (a combination of):
 * Calibration target: The calibration process requires a [ChAruCo target (10x16)](calib.io_charuco_297x210_10x16_15_DICT_4X4.pdf) printed on a rigid surface of approximately the size of a US letter or A4 at 100% scale. (Please check printer settings which might be different from default!)
 
 * Lighting: Sufficient and uniform lighting and a uniform background (that can cover up to around half of the field of view) are important for good and repeatable calibration results.
+(During testing lux level at camera view point was between 30 and 100 lux.)
 
 * View points: Six static poses are provided, your procedure should aim to replicating them as closely as possible. It is recommended to create a mechanical fixture or use a robot to execute the poses as closely as possible and achieve repeatable calibration results. The camera images in poses.pdf can be used for a visual check of the camera poses for your device setup.
 
@@ -59,7 +60,7 @@ pip install matplotlib # install matplotlib in the venv, used for debug plots
 Then, for every new terminal:
 ```
 source py3librs/bin/activate # Activate the virtual environment
-python3 t265_aruco.py # Run the example
+python3 t261_calibrate.py # Run the example
 ```
 
 ## Running the T261 calibration sample
