@@ -4,7 +4,32 @@ In order to provide the best tracking, an accurate calibration of T261 is requir
 
 ## Overview
 
-This python sample supports the basic functionality of capturing N stereo image pairs, performing an intrinsic calibration for both cameras and writing out the calibration data into a json calibration file. In a future version this will be replaced with calls to librealsense to directly write the calibration to the device.
+This python sample supports the basic functionality of:
+- capturing N stereo image pairs;
+- performing an intrinsic calibration for both cameras;
+- optionally, performing a calibration of the extrinsics between the stereo pair;
+- performing a (basic) check of the quality of the calibration result (in terms of reprojection error and FOV coverage);
+- writing out the calibration data into a json calibration file;
+- and, optionally, writing the calibration result (intrinsics and possibly extrinsics) to the device.
+
+The sample application also has the functionality to reset the calibration to the factory calibration.
+
+### Command line options
+The possible command line options are (a combination of):
+```
+--extrinsics                     // extrinsics of the stereo pair will be calibrated
+                                 // and written to device in combination with --write
+                                 // on default only intrinsics of the two imagers will be calibrated
+--write                          // will write calibration result to the device
+                                 // if calibration is succesful, user has to confirm in a prompt dialog
+--confirm                        // will skip the prompt to confirm writing to device
+--skip_check                     // will skip the check of some basic calibration quality criteria
+--reset                          // will reset the calibration to factory calibration (and exit)
+--images <PATH_TO_IMAGE_FOLDER>  // will perform calibration on a folder of recorded images
+                                 // in the format that is output by the calibration tool to a temporary folder
+                                 // together with a corresponding calibration file
+--sn <SERIAL_NUMBER>             // will use a serial number as provided by the user
+```
 
 ## Setup
 
