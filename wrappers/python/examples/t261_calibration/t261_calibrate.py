@@ -60,7 +60,7 @@ the lenses.
 board_width = 16
 board_height = 10
 checker_size_m = 0.015
-april_size_m = 0.0075
+april_size_m = 0.01125 # Size includes black border of apriltag
 
 dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_100)
 board = cv2.aruco.CharucoBoard_create(board_width, board_height, checker_size_m, april_size_m, dictionary)
