@@ -488,7 +488,7 @@ def calibrate_extrinsics(observations, K1, D1, K2, D2):
 
 def check_calibration(rms1, rms2, support1, support2):
     rms_thresh = 0.5
-    min_support = 350
+    min_support = 340
     failed = False
     print()
     if rms1 > rms_thresh or rms2 > rms_thresh:
