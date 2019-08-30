@@ -45,22 +45,12 @@ The possible command line options are (a combination of):
 ### Software
 On Ubuntu 16.04 (tested), please follow the installation instructions below.
 
-First, set up the virtual enviroment:
-```
-apt-get install python3-venv # install python3 built in venv support
-python3 -m venv py3librs # create a virtual environment in pylibrs
-source py3librs/bin/activate # activate the venv, do this from every terminal
 pip install pyrealsense2 # install librealsense python bindings
 pip install opencv-python # install opencv 4.1 in the venv
 pip install opencv-contrib-python # install opencv extra modules including aruco
 pip install transformations # install transformations in the venv
 pip install matplotlib # install matplotlib in the venv, used for debug plots
-```
 
-Then, for every new terminal:
-```
-source py3librs/bin/activate # Activate the virtual environment
-python3 t261_calibrate.py # Run the example
 ```
 
 ## Running the T261 calibration sample
