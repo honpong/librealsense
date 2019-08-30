@@ -51,6 +51,7 @@ sudo pip3 install opencv-python # install opencv 4.1 in the venv
 sudo pip3 install opencv-contrib-python # install opencv extra modules including aruco
 sudo pip3 install transformations # install transformations in the venv
 sudo pip3 install matplotlib # install matplotlib in the venv, used for debug plots
+sudo apt install python3-tk
 
 ```
 
