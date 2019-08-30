@@ -45,11 +45,12 @@ The possible command line options are (a combination of):
 ### Software
 On Ubuntu 16.04 (tested), please follow the installation instructions below.
 
-pip install pyrealsense2 # install librealsense python bindings
-pip install opencv-python # install opencv 4.1 in the venv
-pip install opencv-contrib-python # install opencv extra modules including aruco
-pip install transformations # install transformations in the venv
-pip install matplotlib # install matplotlib in the venv, used for debug plots
+sudo apt-get install python3-pip
+sudo pip3 install pyrealsense2 # install librealsense python bindings
+sudo pip3 install opencv-python # install opencv 4.1 in the venv
+sudo pip3 install opencv-contrib-python # install opencv extra modules including aruco
+sudo pip3 install transformations # install transformations in the venv
+sudo pip3 install matplotlib # install matplotlib in the venv, used for debug plots
 
 ```
 
