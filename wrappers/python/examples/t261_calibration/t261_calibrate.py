@@ -1,8 +1,7 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ## License: Apache 2.0. See LICENSE file in root directory.
 ## Copyright(c) 2019 Intel Corporation. All Rights Reserved.
-from __future__ import print_function  # Python 2/3 compatibility
 
 import pyrealsense2 as rs
 import cv2
