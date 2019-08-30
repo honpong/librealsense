@@ -50,7 +50,7 @@ First, set up the virtual enviroment:
 apt-get install python3-venv # install python3 built in venv support
 python3 -m venv py3librs # create a virtual environment in pylibrs
 source py3librs/bin/activate # activate the venv, do this from every terminal
-pip install -i https://test.pypi.org/simple/ pyrealsense2==2.27.0.1062 # install librealsense python bindings, current development branch with LRS T261 calibration changes, to be updated after release (pip install pyrealsense2)
+pip install pyrealsense2 # install librealsense python bindings
 pip install opencv-python # install opencv 4.1 in the venv
 pip install opencv-contrib-python # install opencv extra modules including aruco
 pip install transformations # install transformations in the venv
