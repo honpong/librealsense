@@ -238,7 +238,7 @@ int main(int argc, char * argv[]) try
                 bin_file_from_bytes(map_path, tm_sensor.export_localization_map());
                 std::cout << "Saving relocalization map to: " << map_path << std::endl;
             }
-            break;
+            //break;
         case GLFW_KEY_ESCAPE:
             // Exit if user presses escape
             app.close();
