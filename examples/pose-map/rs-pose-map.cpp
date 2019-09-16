@@ -182,15 +182,24 @@ int main(int argc, char * argv[]) try
     rs2::pipeline_profile pipe_profile = cfg.resolve(pipe);
     // Initialize a shared pointer to a device with the current device on the pipeline
     rs2::pose_sensor tm_sensor = pipe_profile.get_device().first<rs2::pose_sensor>();
-    const char *map_path = arg_map_path.getValue().c_str();
-    const bool load_map = true, save_map = true;
-    if (tm_sensor && load_map) {
-        if (tm_sensor.import_localization_map(bytes_from_bin_file(map_path)))
+    const auto map_path = arg_map_path.getValue();
+    const bool is_load_map = arg_load_map.getValue();
+    const bool is_create_map = arg_create_map.getValue() && !is_load_map;
+    const bool allow_save_map = is_create_map;
+    const std::string origin_name = arg_landmark.getValue();
+    bool is_origin_loaded = false, is_origin_saved = false;
+    rs2_vector origin_pose;
+    rs2_quaternion origin_orient;
+
+    if (tm_sensor && is_load_map) {
+        if (tm_sensor.import_localization_map(bytes_from_bin_file(map_path))) {
             std::cout << "Map loading success." << std::endl;
+        }
     }
 
     // Start pipeline with chosen configuration
     pipe.start(cfg);
+   
     // T265 has two fisheye sensors, we can choose any of them (index 1 or 2)
     const int fisheye_sensor_idx = 1;
 
@@ -227,6 +236,28 @@ int main(int argc, char * argv[]) try
 
             // Copy current camera pose
             device_pose_in_world = pose_frame.get_pose_data();
+
+            if (device_pose_in_world.tracker_confidence > 3)
+            {
+                if (is_create_map && !is_origin_saved) {
+                    if (tm_sensor.set_static_node(origin_name, rs2_vector{ 0,0,0 }, rs2_quaternion{ 0,0,0,1 }) == true)
+                    {
+                        is_origin_saved = true;
+                        std::cout << "Set " << origin_name << " at origin " << std::endl;
+                    }
+                }
+
+                if (is_load_map && !is_origin_loaded)
+                {
+                    bool is_map_relocalized = false; // need a callback to enable this flag
+                    if (is_map_relocalized) {
+                        tm_sensor.get_static_node(origin_name, origin_pose, origin_orient);
+                        is_origin_loaded = true;
+
+                        std::cout << "Map " << map_path << " realigned using landmark " << origin_name << std::endl;
+                    }
+                }
+            }
 
             // Render the fisheye image
             fisheye_image.render(fisheye_frame, { 0, 0, app.width(), app.height() });
@@ -276,16 +307,21 @@ int main(int argc, char * argv[]) try
                 objects_in_world[node_name] = object_pose_in_world;
             break;
         }
-        case GLFW_KEY_S:
-            if (save_map)
-            {
-                pipe.stop();
-                bin_file_from_bytes(map_path, tm_sensor.export_localization_map());
-                std::cout << "Saving relocalization map to: " << map_path << std::endl;
-            }
-            //break;
+
+        // Exit if user presses escape
         case GLFW_KEY_ESCAPE:
-            // Exit if user presses escape
+        case GLFW_KEY_S:
+            pipe.stop();
+            if (allow_save_map) {
+                if (is_origin_saved)
+                {
+                    bin_file_from_bytes(map_path, tm_sensor.export_localization_map());
+                    std::cout << "Saving relocalization map to: " << map_path << std::endl;
+                }
+                else {
+                    std::cout << "WARNING, no origin node has been defined, no map saved." << std::endl;
+                }
+            }
             app.close();
             break;
         }
