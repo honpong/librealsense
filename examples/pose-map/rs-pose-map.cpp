@@ -127,6 +127,40 @@ private:
     }
 };
 
+
+/**
+rs2_pose compose(const transformation& T_a_b, const rs2_pose& rs_b_pose) {
+    rs2_pose rs_a_pose = rs_b_pose;
+    transformation T_a_pose = T_a_b * to_transformation(rs_b_pose.translation, rs_b_pose.rotation);
+    rs_a_pose.translation = to_rs_vector(T_a_pose.T);
+    rs_a_pose.rotation = to_rs_quaternion(T_a_b.Q);
+    rs_a_pose.velocity = to_rs_vector(T_a_b.Q * to_v3(rs_b_pose.velocity));
+    rs_a_pose.angular_velocity = to_rs_vector(T_a_b.Q * to_v3(rs_b_pose.angular_velocity));
+    rs_a_pose.acceleration = to_rs_vector(T_a_b.Q * to_v3(rs_b_pose.acceleration));
+    rs_a_pose.angular_acceleration = to_rs_vector(T_a_b.Q * to_v3(rs_b_pose.angular_acceleration));
+}
+*/
+rs2_pose aligned_to_origin_node(const rs2_pose device_pose, const rs2_vector pos0, const rs2_quaternion rot0)
+{
+    //device_pose = device_in_new_origin;
+    //node0 = (pos0,rot0) = old_origin_in_new_origin
+    //aligned_pose = device_in_new_origin * inv(old_origin_in_new_origin);
+
+    const rs2_quaternion inv_rot0 = quaternion_conjugate(rot0);
+    const rs2_vector inv_pos0 = vector_negate(quaternion_rotate_vector(inv_rot0, pos0));
+
+    rs2_pose dst;
+    dst.translation = vector_addition(quaternion_rotate_vector(inv_rot0, device_pose.translation), inv_pos0);
+    dst.rotation = quaternion_multiply(inv_rot0, device_pose.rotation);
+    dst.velocity = quaternion_rotate_vector(dst.rotation, device_pose.velocity);
+    dst.angular_velocity = quaternion_rotate_vector(dst.rotation, device_pose.angular_velocity);
+    dst.acceleration = quaternion_rotate_vector(dst.rotation, device_pose.acceleration);
+    dst.angular_acceleration = quaternion_rotate_vector(dst.rotation, device_pose.angular_acceleration);
+
+    return dst;
+}
+
+
 using namespace TCLAP;
 
 int main(int argc, char * argv[]) try
@@ -157,7 +191,7 @@ int main(int argc, char * argv[]) try
         "Run this application in map creation mode, a default static node name \"node0\" "
         "will be created at origin.", false);
     SwitchArg             arg_load_map("l", "load_map",
-        "Run this application in tracking mode with map loaded at the beginning.", true);
+        "Run this application in tracking mode with map loaded at the beginning.", false);
     ValueArg<std::string> arg_landmark("n", "landmark", 
         "Specifiy the name of the landmark (static node) used as reference for alignment when "
         "the map is created or loaded, default landmark name is \"node0\".", false, "node0", "landmark name");
@@ -183,12 +217,13 @@ int main(int argc, char * argv[]) try
     // Initialize a shared pointer to a device with the current device on the pipeline
     rs2::pose_sensor tm_sensor = pipe_profile.get_device().first<rs2::pose_sensor>();
     const auto map_path = arg_map_path.getValue();
-    const bool is_load_map = arg_load_map.getValue();
-    const bool is_create_map = arg_create_map.getValue() && !is_load_map;
+    const bool is_create_map = arg_create_map.getValue() && !arg_load_map.getValue();
+    const bool is_load_map = arg_load_map.getValue() || !is_create_map;
     const bool allow_save_map = is_create_map;
     const std::string origin_name = arg_landmark.getValue();
     bool is_origin_loaded = false, is_origin_saved = false;
-    rs2_vector origin_pose;
+    bool is_map_relocalized = false;
+    rs2_vector origin_pos;
     rs2_quaternion origin_orient;
 
     if (tm_sensor && is_load_map) {
@@ -198,8 +233,21 @@ int main(int argc, char * argv[]) try
     }
 
     // Start pipeline with chosen configuration
-    pipe.start(cfg);
-   
+    pipe_profile = pipe.start(cfg);
+    tm_sensor = pipe_profile.get_device().first<rs2::pose_sensor>();
+    tm_sensor.set_notifications_callback([&](const rs2::notification& n) {
+        if (n.get_category() == RS2_NOTIFICATION_CATEGORY_HARDWARE_EVENT) {
+            auto desc = n.get_description();
+            auto prefix = "T2xx: Relocalization occurred.";
+            if (desc.find(prefix) != std::string::npos) {
+                //this is a relocalization event
+                std::cout << "Relocalized Event Detected." << std::endl;
+                is_map_relocalized = true;
+            }
+        }
+    });
+
+  
     // T265 has two fisheye sensors, we can choose any of them (index 1 or 2)
     const int fisheye_sensor_idx = 1;
 
@@ -225,6 +273,7 @@ int main(int argc, char * argv[]) try
     // Main loop
     while (app)
     {
+        rs2_pose aligned_pose_in_world; // this will contain the map-aligned device pose
         rs2_pose device_pose_in_world; // This will contain the current device pose
         {
             // Wait for the next set of frames from the camera
@@ -237,26 +286,39 @@ int main(int argc, char * argv[]) try
             // Copy current camera pose
             device_pose_in_world = pose_frame.get_pose_data();
 
-            if (device_pose_in_world.tracker_confidence > 3)
+            if (device_pose_in_world.tracker_confidence > 2)
             {
                 if (is_create_map && !is_origin_saved) {
                     if (tm_sensor.set_static_node(origin_name, rs2_vector{ 0,0,0 }, rs2_quaternion{ 0,0,0,1 }) == true)
                     {
                         is_origin_saved = true;
+                        objects_in_world[origin_name] = rs2_pose{ rs2_vector{0,0,0},rs2_vector{0,0,0},rs2_vector{0,0,0},rs2_quaternion{0,0,0,1} };
                         std::cout << "Set " << origin_name << " at origin " << std::endl;
                     }
                 }
 
                 if (is_load_map && !is_origin_loaded)
                 {
-                    bool is_map_relocalized = false; // need a callback to enable this flag
                     if (is_map_relocalized) {
-                        tm_sensor.get_static_node(origin_name, origin_pose, origin_orient);
+                        tm_sensor.get_static_node(origin_name, origin_pos, origin_orient);
                         is_origin_loaded = true;
+                        objects_in_world[origin_name] = rs2_pose{ origin_pos,rs2_vector{0,0,0},rs2_vector{0,0,0},origin_orient };
 
                         std::cout << "Map " << map_path << " realigned using landmark " << origin_name << std::endl;
                     }
                 }
+            }
+
+            if (is_create_map)
+            {
+                // map creation mode that the device pose is aligned to node0's origin
+                aligned_pose_in_world = device_pose_in_world; 
+            }
+            else if (is_load_map && is_origin_loaded) // map import mode
+            {
+                // TODO: check math
+                //output new aligned pose using origin_pose, origin_orient, device_pose_in_world
+                aligned_pose_in_world = aligned_to_origin_node(device_pose_in_world, origin_pos, origin_orient);
             }
 
             // Render the fisheye image
