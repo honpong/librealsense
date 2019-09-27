@@ -1899,7 +1899,7 @@ namespace perc {
         return fwToHostStatus((MESSAGE_STATUS)response.header.wStatus);
     }
 
-    Status Device::ChangePoseOrigin(uint32_t mapId)
+    Status Device::ChangePoseOrigin(MapId mapId)
     {
         if (mOriginNode) {
             mOriginNode = nullptr;

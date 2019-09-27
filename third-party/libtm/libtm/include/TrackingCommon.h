@@ -47,6 +47,7 @@ namespace perc {
 
     typedef uint8_t SensorId;
     typedef uint16_t SessionId;
+    typedef int MapId;
 
     /**
     * @brief Defines all sensors types (bSensorID/bCameraID/bMotionID)
