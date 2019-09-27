@@ -1548,7 +1548,7 @@ namespace librealsense
         throw io_exception(to_string() << "Unexpected error changing pose origin, status = " << (uint32_t)status);
     }
     
-    bool tm2_sensor::change_pose_origin(uint32_t map_id) const
+    bool tm2_sensor::change_pose_origin(int map_id) const
     {
         if (!_tm_dev)
             throw wrong_api_call_sequence_exception("T2xx tracking device is not available");

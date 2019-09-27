@@ -31,7 +31,7 @@ namespace librealsense
         virtual bool set_static_node(const std::string& guid, const float3& pos, const float4& orient_quat) const = 0;
         virtual bool get_static_node(const std::string& guid, float3& pos, float4& orient_quat) const = 0;
         virtual bool change_pose_origin(const std::string& guid) const = 0;
-        virtual bool change_pose_origin(uint32_t map_id) const  = 0;
+        virtual bool change_pose_origin(int map_id) const  = 0;
         virtual ~pose_sensor_interface() = default;
     };
     MAP_EXTENSION(RS2_EXTENSION_POSE_SENSOR, librealsense::pose_sensor_interface);
