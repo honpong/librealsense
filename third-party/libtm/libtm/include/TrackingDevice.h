@@ -438,6 +438,23 @@ namespace perc
         virtual Status GetStaticNode(IN const char* guid, OUT TrackingData::RelativePose& relativePose) = 0;
 
         /**
+        * @brief ChangePoseOrigin
+        *        Change the output pose origin to the origin of the relocalization map
+        * @param mapId - ID of the map
+        * @return Status
+        */
+        virtual Status ChangePoseOrigin(IN uint32_t mapId) = 0;
+
+        /**
+        * @brief ChangePoseOrigin
+        *        Change the output pose origin to a static node
+        * @param guid - Unique name (Null-terminated C-string) for the static node, max length 127 bytes plus one byte for the terminating null character
+        * @param effectiveTime - 
+        * @return Status
+        */
+        virtual Status ChangePoseOrigin(IN const char* guid) = 0;
+
+        /**
         * @brief SetGeoLocation
         *        Sets the geographical location (e.g. GPS data). This data can be later used by the algorithms to correct IMU readings.
         * @param geoLocation - latitude, longitude, altitude

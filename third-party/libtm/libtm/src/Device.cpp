@@ -1899,6 +1899,32 @@ namespace perc {
         return fwToHostStatus((MESSAGE_STATUS)response.header.wStatus);
     }
 
+    Status Device::ChangePoseOrigin(uint32_t mapId)
+    {
+        if (mOriginNode) {
+            mOriginNode = nullptr;
+            return Status::SUCCESS;
+        }
+        return Status::ERROR_PARAMETER_INVALID;
+    }
+
+    Status Device::ChangePoseOrigin(const char* guid)
+    {
+        auto staticNodePose = std::make_unique<TrackingData::RelativePose>();
+        auto sts = GetStaticNode(guid, *staticNodePose);
+
+        if (sts == Status::SUCCESS) 
+        {
+            mOriginNode = std::move(staticNodePose);
+        }
+        else
+        {
+            DEVICELOGE("Error: unable to get static node %s when changing origin", guid);
+        }
+
+        return sts;
+    }
+
     Status Device::SetCalibration(const TrackingData::CalibrationData& calibrationData)
     {
         if (calibrationData.length > MAX_SLAM_CALIBRATION_SIZE)
@@ -2933,6 +2959,48 @@ namespace perc {
                 {
                     interrupt_message_get_pose poseMsg = *((interrupt_message_get_pose*)header);
                     auto pose = poseMessageToClass(poseMsg.pose, poseMsg.bIndex, poseMsg.pose.llNanoseconds + mTM2CorrelatedTimeStampShift);
+                    if (mOriginNode) //Change pose origin
+                    {
+                        const auto VectorAddition = [](const TrackingData::Axis& a, const TrackingData::Axis& b){
+                            return TrackingData::Axis(a.x + b.x, a.y + b.y, a.z + b.z);
+                        };
+                        const auto QuaternionConjugate = [](const TrackingData::Quaternion& q) {
+                            return TrackingData::Quaternion(-q.i, -q.j, -q.k, q.r);
+                        };
+                        const auto QuaternionMultiply = [](const TrackingData::Quaternion& a, const TrackingData::Quaternion& b) {
+                            return TrackingData::Quaternion(
+                                a.i * b.r + a.r * b.i - a.k * b.j + a.j * b.k,
+                                a.j * b.r + a.k * b.i + a.r * b.j - a.i * b.k,
+                                a.k * b.r - a.j * b.i + a.i * b.j + a.r * b.k,
+                                a.r * b.r - a.i * b.i - a.j * b.j - a.k * b.k
+                            );
+                        };
+                        const auto QuaternionRotateVector = [&](const TrackingData::Quaternion& q, const TrackingData::Axis& v) {
+                            auto rotated_v = QuaternionMultiply(QuaternionMultiply(q, TrackingData::Quaternion(v.x, v.y, v.z, 0)),QuaternionConjugate(q));
+                            return TrackingData::Axis(rotated_v.i, rotated_v.j, rotated_v.k);
+                        };
+                        const auto QuaternionRotateEulerAngles = [&](const TrackingData::Quaternion& q, const TrackingData::EulerAngles& a) {
+                            auto rotated_a = QuaternionMultiply(QuaternionMultiply(q, TrackingData::Quaternion(a.x, a.y, a.z, 0)), QuaternionConjugate(q));
+                            return TrackingData::EulerAngles(rotated_a.i, rotated_a.j, rotated_a.k);
+                        };
+
+                        //get new origin
+                        const auto& rot0 = mOriginNode->rotation;
+                        const auto& pos0 = mOriginNode->translation;
+                        const auto inv_rot0 = QuaternionConjugate(pose.rotation);
+                        const auto inv_pos0 = TrackingData::Axis(-pos0.x, -pos0.y, -pos0.z);
+                        
+                        //save original pose output
+                        const TrackingData::PoseFrame src_pose = pose; 
+
+                        //compute new pose using new origin
+                        pose.translation = VectorAddition(QuaternionRotateVector(inv_rot0, src_pose.translation), inv_pos0);
+                        pose.rotation = QuaternionMultiply(inv_rot0, src_pose.rotation);
+                        pose.velocity = QuaternionRotateVector(pose.rotation, src_pose.velocity);
+                        pose.angularVelocity = QuaternionRotateEulerAngles(pose.rotation, src_pose.angularVelocity);
+                        pose.acceleration = QuaternionRotateVector(pose.rotation, src_pose.acceleration);
+                        pose.angularAcceleration = QuaternionRotateEulerAngles(pose.rotation, src_pose.angularAcceleration);
+                    }
                     std::shared_ptr<CompleteTask> ptr = std::make_shared<PoseCompleteTask>(mListener, pose, this);
 
                     /* Pose must arrive every 5 msec */
@@ -2951,6 +3019,7 @@ namespace perc {
                         }
                     }
 
+              
                     sixdofPrevFrame[pose.sourceIndex].prevFrameTimeStamp = pose.timestamp;
 
                     mTaskHandler->addTask(ptr);
