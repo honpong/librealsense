@@ -64,6 +64,8 @@ namespace perc
         virtual Status SetLocalizationData(Listener* listener, uint32_t length, const uint8_t* buffer) override;
         virtual Status SetStaticNode(const char* guid, const TrackingData::RelativePose& relativePose) override;
         virtual Status GetStaticNode(const char* guid, TrackingData::RelativePose& relativePose) override;
+        virtual Status ChangePoseOrigin(uint32_t mapId) override;
+        virtual Status ChangePoseOrigin(const char* guid) override;
         virtual Status SetGeoLocation(const TrackingData::GeoLocalization& geoLocation) override;
         virtual Status EepromRead(uint16_t offset, uint16_t size, uint8_t* buffer, uint16_t& actual) override;
         virtual Status EepromWrite(uint16_t offset, uint16_t size, uint8_t* buffer, uint16_t& actual, bool verify = false) override;
@@ -405,6 +407,7 @@ namespace perc
         std::list<std::shared_ptr<uint8_t>> mFramesBuffersLists;
         std::map<SensorId, uint16_t> mWidthsMap;
         std::map<SensorId, uint16_t> mHeightsMap;
+        std::unique_ptr<TrackingData::RelativePose> mOriginNode;
 
         bool mPlaybackIsOn;
         bool mSyncTimeEnabled;
