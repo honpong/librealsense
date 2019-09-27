@@ -443,7 +443,7 @@ namespace perc
         * @param mapId - ID of the map
         * @return Status
         */
-        virtual Status ChangePoseOrigin(IN uint32_t mapId) = 0;
+        virtual Status ChangePoseOrigin(IN MapId mapId) = 0;
 
         /**
         * @brief ChangePoseOrigin
