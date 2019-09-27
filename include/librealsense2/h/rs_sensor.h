@@ -531,6 +531,10 @@ int rs2_set_static_node(const rs2_sensor* sensor, const char* guid, const rs2_ve
 */
 int rs2_get_static_node(const rs2_sensor* sensor, const char* guid, rs2_vector *pos, rs2_quaternion *orient, rs2_error** error);
 
+int rs2_change_pose_origin(const rs2_sensor* sensor, const char* guid, rs2_error** error);
+
+int rs2_change_pose_origin_to_map(const rs2_sensor* sensor, int map_id, rs2_error** error);
+
 /** Load Wheel odometer settings from host to device
 * \param[in] odometry_config_buf   odometer configuration/calibration blob serialized from jsom file
 * \return true on success

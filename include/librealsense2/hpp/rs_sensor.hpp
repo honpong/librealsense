@@ -531,6 +531,22 @@ namespace rs2
             return !!res;
         }
 
+        bool change_pose_origin(const std::string& guid) const
+        {
+            rs2_error* e = nullptr;
+            auto res = rs2_change_pose_origin(_sensor.get(), guid.c_str(), &e);
+            error::handle(e);
+            return !!res;
+        }
+
+        bool change_pose_orgin_to_map(int map_id) const
+        {
+            rs2_error* e = nullptr;
+            auto res = rs2_change_pose_origin_to_map(_sensor.get(), map_id, &e);
+            error::handle(e);
+            return !!res;
+        }
+
         operator bool() const { return _sensor.get() != nullptr; }
         explicit pose_sensor(std::shared_ptr<rs2_sensor> dev) : pose_sensor(sensor(dev)) {}
     };
