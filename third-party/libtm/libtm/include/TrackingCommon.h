@@ -62,9 +62,10 @@ namespace perc {
         Controller = 6,
         Rssi = 7,
         Velocimeter = 8,
-        Stereo = 9,
-        Pose = 10,
-        ControllerProperty = 11,
+        Mask = 9,
+        Stereo = 10,
+        Pose = 11,
+        ControllerProperty = 12,
         Max
     };
 
