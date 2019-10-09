@@ -452,7 +452,7 @@ namespace perc
         * @param effectiveTime - 
         * @return Status
         */
-        virtual Status ChangePoseOrigin(IN const char* guid) = 0;
+        virtual Status ChangePoseOrigin(IN const char* guid, OUT double_t& effectiveTime) = 0;
 
         /**
         * @brief SetGeoLocation

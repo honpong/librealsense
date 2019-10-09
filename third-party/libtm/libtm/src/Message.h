@@ -1103,6 +1103,7 @@ namespace perc
     typedef struct {
         bulk_message_response_header header;
         static_node_data data; 
+        double_t effective_time;
     } bulk_message_response_change_pose_origin_to_node;
 
     typedef struct {

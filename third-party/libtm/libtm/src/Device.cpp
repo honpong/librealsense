@@ -1927,7 +1927,7 @@ namespace perc {
         return fwToHostStatus((MESSAGE_STATUS)response.header.wStatus);
     }
 
-    Status Device::ChangePoseOrigin(const char* guid)
+    Status Device::ChangePoseOrigin(const char* guid, double_t& effectiveTime)
     {
         bulk_message_request_change_pose_origin_to_node request = { 0 };
         bulk_message_response_change_pose_origin_to_node response = { 0 };
@@ -1954,7 +1954,7 @@ namespace perc {
             return Status::ERROR_USB_TRANSFER;
         }
 
-        DEVICELOGD("Change pose origin: node guid [%s], translation [%f,%f,%f], rotation [%f,%f,%f,%f]", guid, response.data.flX, response.data.flY, response.data.flZ, response.data.flQi, response.data.flQj, response.data.flQk, response.data.flQr);
+        DEVICELOGD("Change pose origin: node guid [%s], effective time [%f], translation [%f,%f,%f], rotation [%f,%f,%f,%f]", guid, response.effective_time, response.data.flX, response.data.flY, response.data.flZ, response.data.flQi, response.data.flQj, response.data.flQk, response.data.flQr);
 
         return fwToHostStatus((MESSAGE_STATUS)response.header.wStatus);
     }
