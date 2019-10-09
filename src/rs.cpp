@@ -2398,14 +2398,14 @@ int rs2_get_static_node(const rs2_sensor* sensor, const char* guid, rs2_vector *
 }
 HANDLE_EXCEPTIONS_AND_RETURN(0, sensor, guid, pos, orient)
 
-int rs2_change_pose_origin(const rs2_sensor* sensor, const char* guid, rs2_error** error) BEGIN_API_CALL
+int rs2_change_pose_origin(const rs2_sensor* sensor, const char* guid, double* effective_time, rs2_error** error) BEGIN_API_CALL
 {
     VALIDATE_NOT_NULL(sensor);
     VALIDATE_NOT_NULL(guid);
 
     auto pose_snr = VALIDATE_INTERFACE(sensor->sensor, librealsense::pose_sensor_interface);
     std::string s_guid(guid);
-    return int(pose_snr->change_pose_origin(s_guid));
+    return int(pose_snr->change_pose_origin(s_guid, *effective_time));
 }
 HANDLE_EXCEPTIONS_AND_RETURN(-1, sensor, guid)
 
