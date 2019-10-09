@@ -1901,28 +1901,62 @@ namespace perc {
 
     Status Device::ChangePoseOrigin(MapId mapId)
     {
-        if (mOriginNode) {
-            mOriginNode = nullptr;
-            return Status::SUCCESS;
+        bulk_message_request_change_pose_origin_to_map request = { 0 };
+        bulk_message_response_change_pose_origin_to_map response = { 0 };
+
+        request.header.wMessageID = SLAM_CHANGE_ORIGIN_TO_MAP;
+        request.header.dwLength = sizeof(request);
+        request.dwMapId = mapId;
+
+        Bulk_Message msg((uint8_t*)&request, request.header.dwLength, (uint8_t*)&response, sizeof(response), mEndpointBulkMessages | TO_DEVICE, mEndpointBulkMessages | TO_HOST);
+
+        mDispatcher->sendMessage(&mFsm, msg);
+        // ERROR_FW_INTERNAL just means we were unable to get the node
+        if (msg.Result == toUnderlying(Status::ERROR_FW_INTERNAL))
+        {
+            return Status::ERROR_FW_INTERNAL;
         }
-        return Status::ERROR_PARAMETER_INVALID;
+        if (msg.Result != toUnderlying(Status::SUCCESS))
+        {
+            DEVICELOGE("USB Error (0x%X)", msg.Result);
+            return Status::ERROR_USB_TRANSFER;
+        }
+
+        DEVICELOGD("Change pose origin: map id [%d], response [%s] ", mapId, ((response.dwMapId == mapId) ? "success" : "failed"));
+
+        return fwToHostStatus((MESSAGE_STATUS)response.header.wStatus);
     }
 
     Status Device::ChangePoseOrigin(const char* guid)
     {
-        auto staticNodePose = std::make_unique<TrackingData::RelativePose>();
-        auto sts = GetStaticNode(guid, *staticNodePose);
+        bulk_message_request_change_pose_origin_to_node request = { 0 };
+        bulk_message_response_change_pose_origin_to_node response = { 0 };
 
-        if (sts == Status::SUCCESS) 
+        auto length = perc::stringLength(guid, MAX_GUID_LENGTH);
+        if (length > (MAX_GUID_LENGTH - 1))
         {
-            mOriginNode = std::move(staticNodePose);
+            DEVICELOGE("Error: guid length is too big, max length = %d", (MAX_GUID_LENGTH - 1));
+            return Status::ERROR_PARAMETER_INVALID;
         }
-        else
+        snprintf((char*)request.bGuid, length + 1, "%s", guid);
+
+        Bulk_Message msg((uint8_t*)&request, request.header.dwLength, (uint8_t*)&response, sizeof(response), mEndpointBulkMessages | TO_DEVICE, mEndpointBulkMessages | TO_HOST);
+
+        mDispatcher->sendMessage(&mFsm, msg);
+        // ERROR_FW_INTERNAL just means we were unable to get the node
+        if (msg.Result == toUnderlying(Status::ERROR_FW_INTERNAL))
         {
-            DEVICELOGE("Error: unable to get static node %s when changing origin", guid);
+            return Status::ERROR_FW_INTERNAL;
+        }
+        if (msg.Result != toUnderlying(Status::SUCCESS))
+        {
+            DEVICELOGE("USB Error (0x%X)", msg.Result);
+            return Status::ERROR_USB_TRANSFER;
         }
 
-        return sts;
+        DEVICELOGD("Change pose origin: node guid [%s], translation [%f,%f,%f], rotation [%f,%f,%f,%f]", guid, response.data.flX, response.data.flY, response.data.flZ, response.data.flQi, response.data.flQj, response.data.flQk, response.data.flQr);
+
+        return fwToHostStatus((MESSAGE_STATUS)response.header.wStatus);
     }
 
     Status Device::SetCalibration(const TrackingData::CalibrationData& calibrationData)
