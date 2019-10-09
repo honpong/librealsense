@@ -1534,12 +1534,12 @@ namespace librealsense
         throw io_exception(to_string() << "Unexpected error getting static node, status = " << (uint32_t)status);
     }
 
-    bool tm2_sensor::change_pose_origin(const std::string& guid) const
+    bool tm2_sensor::change_pose_origin(const std::string& guid, double& effective_time) const
     {
         if (!_tm_dev)
             throw wrong_api_call_sequence_exception("T2xx tracking device is not available");
 
-        auto status = _tm_dev->ChangePoseOrigin(guid.c_str());
+        auto status = _tm_dev->ChangePoseOrigin(guid.c_str(), effective_time);
         if (status == perc::Status::SUCCESS)
         {
             return true;
