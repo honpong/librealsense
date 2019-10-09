@@ -535,10 +535,11 @@ int rs2_get_static_node(const rs2_sensor* sensor, const char* guid, rs2_vector *
 /* Change output pose origin to a named landmark in the map
 * \param[in]  sensor    T2xx position-tracking sensor
 * \param[in]  guid      Null-terminated string of up to 127 characters
+* \param[out] effective_time when the change of origin happened
 * \param[out] error     If non-null, receives any error that occurs during this call, otherwise, errors are ignored
 * \return               Non-zero if succeeded, otherwise 0
 */
-int rs2_change_pose_origin(const rs2_sensor* sensor, const char* guid, rs2_error** error);
+int rs2_change_pose_origin(const rs2_sensor* sensor, const char* guid, double* effective_time, rs2_error** error);
 
 /**
 * Change output pose origin to the origin of a map
