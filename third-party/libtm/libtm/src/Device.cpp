@@ -2959,6 +2959,8 @@ namespace perc {
                 {
                     interrupt_message_get_pose poseMsg = *((interrupt_message_get_pose*)header);
                     auto pose = poseMessageToClass(poseMsg.pose, poseMsg.bIndex, poseMsg.pose.llNanoseconds + mTM2CorrelatedTimeStampShift);
+                    
+                    /**
                     if (mOriginNode) //Change pose origin
                     {
                         const auto VectorAddition = [](const TrackingData::Axis& a, const TrackingData::Axis& b){
@@ -3001,6 +3003,7 @@ namespace perc {
                         pose.acceleration = QuaternionRotateVector(pose.rotation, src_pose.acceleration);
                         pose.angularAcceleration = QuaternionRotateEulerAngles(pose.rotation, src_pose.angularAcceleration);
                     }
+                    */
                     std::shared_ptr<CompleteTask> ptr = std::make_shared<PoseCompleteTask>(mListener, pose, this);
 
                     /* Pose must arrive every 5 msec */

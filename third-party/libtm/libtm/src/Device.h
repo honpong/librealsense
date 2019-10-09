@@ -407,7 +407,6 @@ namespace perc
         std::list<std::shared_ptr<uint8_t>> mFramesBuffersLists;
         std::map<SensorId, uint16_t> mWidthsMap;
         std::map<SensorId, uint16_t> mHeightsMap;
-        std::unique_ptr<TrackingData::RelativePose> mOriginNode;
 
         bool mPlaybackIsOn;
         bool mSyncTimeEnabled;
