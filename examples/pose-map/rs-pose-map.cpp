@@ -225,6 +225,7 @@ int main(int argc, char * argv[]) try
     bool is_map_relocalized = false;
     rs2_vector origin_pos;
     rs2_quaternion origin_orient;
+    double origin_change_effective_time = 0;
 
     if (tm_sensor && is_load_map) {
         if (tm_sensor.import_localization_map(bytes_from_bin_file(map_path))) {
@@ -236,14 +237,14 @@ int main(int argc, char * argv[]) try
     pipe_profile = pipe.start(cfg);
     tm_sensor = pipe_profile.get_device().first<rs2::pose_sensor>();
     tm_sensor.set_notifications_callback([&](const rs2::notification& n) {
-        if (n.get_category() == RS2_NOTIFICATION_CATEGORY_HARDWARE_EVENT) {
-            auto desc = n.get_description();
-            auto prefix = "T2xx: Relocalization occurred.";
-            if (desc.find(prefix) != std::string::npos) {
+        if (n.get_category() == RS2_NOTIFICATION_CATEGORY_POSE_RELOCALIZATION) {
+            //auto desc = n.get_description();
+            //auto prefix = "T2xx: Relocalization occurred.";
+            //if (desc.find(prefix) != std::string::npos) {
                 //this is a relocalization event
                 std::cout << "Relocalization Event Detected." << std::endl;
                 is_map_relocalized = true;
-            }
+            //}
         }
     });
 
@@ -300,11 +301,20 @@ int main(int argc, char * argv[]) try
                 if (is_load_map && !is_origin_loaded)
                 {
                     if (is_map_relocalized) {
-                        tm_sensor.get_static_node(origin_name, origin_pos, origin_orient);
-                        is_origin_loaded = true;
-                        objects_in_world[origin_name] = rs2_pose{ origin_pos,rs2_vector{0,0,0},rs2_vector{0,0,0},origin_orient };
 
-                        std::cout << "Map " << map_path << " realigned using landmark " << origin_name << std::endl;
+                        try {
+                            tm_sensor.change_pose_origin(origin_name, origin_change_effective_time);
+                            objects_in_world[origin_name] = rs2_pose{ origin_pos,rs2_vector{0,0,0},rs2_vector{0,0,0},origin_orient };
+                            is_origin_loaded = true;
+
+                            std::cout << "Map " << map_path << " realigned using landmark " << origin_name << std::endl;
+                        }
+                        catch (...)
+                        {
+                            origin_change_effective_time = 0;
+                            is_origin_loaded = false;
+                            std::cout << "Error during change of pose origin" << std::endl;
+                        }
                     }
                 }
             }
@@ -318,7 +328,10 @@ int main(int argc, char * argv[]) try
             {
                 // TODO: check math
                 //output new aligned pose using origin_pose, origin_orient, device_pose_in_world
-                aligned_pose_in_world = align_to_origin_node(device_pose_in_world, origin_pos, origin_orient);
+                //aligned_pose_in_world = align_to_origin_node(device_pose_in_world, origin_pos, origin_orient);
+
+                //tm_sensor.change_pose_origin(origin_name, origin_change_effective_time)
+                aligned_pose_in_world = device_pose_in_world;
             }
 
             // Render the fisheye image
@@ -355,7 +368,13 @@ int main(int argc, char * argv[]) try
         }
 
         // Display text in the image
-        render_text(15, (app.height() - 10) / 2, "Press spacebar to reset the pose of the virtual object. Press ESC to exit");
+        //render_text(15, (app.height() - 10) / 2, "Press spacebar to reset the pose of the virtual object. Press ESC to exit");
+        if (is_create_map) {
+            render_text(15, (app.height() - 10) / 2, "Press ESC to save map and then exit");
+        }
+        else{
+            render_text(15, (app.height() - 10) / 2, is_origin_loaded ? "Origin loaded, Press ESC to exit" : "Origin not loaded, please move around.");
+        }
 
         // Check if some key is pressed
         switch (key_watcher.get_key())
