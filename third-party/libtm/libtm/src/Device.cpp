@@ -4363,8 +4363,48 @@ namespace perc {
 
     DEFINE_FSM_ACTION(Device, ACTIVE_STATE, ON_ASYNC_START, msg)
     {
-        DEVICELOGE("State [ACTIVE_STATE] got event [ON_ASYNC_START] ==> [ERROR_STATE]");
-        msg.Result = toUnderlying(Status::SUCCESS);
+        //DEVICELOGE("State [ACTIVE_STATE] got event [ON_ASYNC_START] ==> [ERROR_STATE]");
+        //msg.Result = toUnderlying(Status::SUCCESS);
+        MessageON_ASYNC_START pMsg = dynamic_cast<const MessageON_ASYNC_START&>(msg);
+        switch (pMsg.mMessageId)
+        {
+        case SLAM_GET_LOCALIZATION_DATA:
+        {
+            bulk_message_request_get_localization_data request = { 0 };
+            bulk_message_response_get_localization_data response = { 0 };
+
+            mListener = pMsg.mListener;
+            request.header.wMessageID = pMsg.mMessageId;
+            request.header.dwLength = sizeof(request);
+
+            DEVICELOGD("Get Localization Data");
+
+            Bulk_Message bulkMsg((uint8_t*)&request, request.header.dwLength, (uint8_t*)&response, sizeof(response), mEndpointBulkMessages | TO_DEVICE, mEndpointBulkMessages | TO_HOST);
+            onBulkMessage(bulkMsg);
+
+            if (bulkMsg.Result != toUnderlying(Status::SUCCESS))
+            {
+                DEVICELOGE("USB Error (0x%X)", bulkMsg.Result);
+                msg.Result = toUnderlying(Status::ERROR_USB_TRANSFER);
+                return;
+            }
+
+            msg.Result = response.header.wStatus;
+            break;
+        }
+
+        case SLAM_SET_LOCALIZATION_DATA_STREAM:
+        {
+            return SendLargeMessage(msg);
+        }
+
+        case DEV_FIRMWARE_UPDATE:
+        {
+            return SendLargeMessage(msg);
+        }
+        }
+
+        return;
     }
 
     DEFINE_FSM_ACTION(Device, ACTIVE_STATE, ON_ASYNC_STOP, msg)
