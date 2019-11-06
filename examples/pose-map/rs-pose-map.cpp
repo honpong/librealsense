@@ -223,6 +223,7 @@ int main(int argc, char * argv[]) try
     const std::string origin_name = arg_landmark.getValue();
     bool is_origin_loaded = false, is_origin_saved = false;
     bool is_map_relocalized = false;
+    bool is_map_aligned = false;
     rs2_vector origin_pos;
     rs2_quaternion origin_orient;
     double origin_change_effective_time = 0;
@@ -293,6 +294,7 @@ int main(int argc, char * argv[]) try
                     if (tm_sensor.set_static_node(origin_name, rs2_vector{ 0,0,0 }, rs2_quaternion{ 0,0,0,1 }) == true)
                     {
                         is_origin_saved = true;
+                        is_map_aligned = true;
                         objects_in_world[origin_name] = rs2_pose{ rs2_vector{0,0,0},rs2_vector{0,0,0},rs2_vector{0,0,0},rs2_quaternion{0,0,0,1} };
                         std::cout << "Set " << origin_name << " at origin " << std::endl;
                     }
@@ -303,17 +305,25 @@ int main(int argc, char * argv[]) try
                     if (is_map_relocalized) {
 
                         try {
+                            tm_sensor.get_static_node(origin_name, origin_pos, origin_orient);
+                            is_origin_loaded = true;
+                        }
+                        catch (...) {
+                            is_origin_loaded = false;
+                        }
+
+                        try {
                             tm_sensor.change_pose_origin(origin_name, origin_change_effective_time);
                             objects_in_world[origin_name] = rs2_pose{ origin_pos,rs2_vector{0,0,0},rs2_vector{0,0,0},origin_orient };
-                            is_origin_loaded = true;
+                            is_map_aligned = is_origin_loaded = true;
 
                             std::cout << "Map " << map_path << " realigned using landmark " << origin_name << std::endl;
                         }
                         catch (...)
                         {
                             origin_change_effective_time = 0;
-                            is_origin_loaded = false;
-                            std::cout << "Error during change of pose origin" << std::endl;
+                            is_map_aligned = false;
+                            std::cout << "Error during change of pose origin API, use application level alignment." << std::endl;
                         }
                     }
                 }
@@ -328,9 +338,12 @@ int main(int argc, char * argv[]) try
             {
                 // TODO: check math
                 //output new aligned pose using origin_pose, origin_orient, device_pose_in_world
-                //aligned_pose_in_world = align_to_origin_node(device_pose_in_world, origin_pos, origin_orient);
-
-                //tm_sensor.change_pose_origin(origin_name, origin_change_effective_time)
+                if (!is_map_aligned) {
+                    aligned_pose_in_world = align_to_origin_node(device_pose_in_world, origin_pos, origin_orient);
+                }
+                else {
+                    tm_sensor.change_pose_origin(origin_name, origin_change_effective_time);
+                }
                 aligned_pose_in_world = device_pose_in_world;
             }
 
