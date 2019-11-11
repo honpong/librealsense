@@ -3,7 +3,40 @@
 #include <librealsense2/rs.hpp>
 #include <iostream>
 #include <iomanip>
+#include <fstream>
+#include <future>
 #include "example.hpp"
+
+
+void bin_file_from_bytes(const std::string& filename, const std::vector<uint8_t> bytes)
+{
+    std::ofstream file(filename, std::ios::binary | std::ios::trunc);
+    if (!file.good())
+        throw std::runtime_error("Invalid binary file specified. Verify the target path and location permissions");
+    file.write((char*)bytes.data(), bytes.size());
+}
+
+std::vector<uint8_t> bytes_from_bin_file(const std::string& filename)
+{
+    std::ifstream file(filename.c_str(), std::ios::binary);
+    if (!file.good())
+        throw std::runtime_error("Invalid binary file specified. Verify the source path and location permissions");
+
+    // Determine the file length
+    file.seekg(0, std::ios_base::end);
+    std::size_t size = file.tellg();
+    if (!size)
+        throw std::runtime_error("Invalid binary file -zero-size");
+    file.seekg(0, std::ios_base::beg);
+
+    // Create a vector to store the data
+    std::vector<uint8_t> v(size);
+
+    // Load the data
+    file.read((char*)&v[0], size);
+
+    return v;
+}
 
 static void render_text(int win_height, const std::string& text);
 
@@ -46,7 +79,7 @@ int main(int argc, char * argv[]) try
             pose_data.rotation.x << " " << pose_data.rotation.y << " " <<
             pose_data.rotation.z << " " << pose_data.rotation.w;
 
-        render_text(app.height(), "Press 'S' to set static node, 'C' to change origin");
+        render_text(app.height(), "Press 'S' to add static node, 'M' to save map");
 
         switch (key_watcher.get_key())
         {
@@ -56,15 +89,34 @@ int main(int argc, char * argv[]) try
                 pose_data.translation,
                 pose_data.rotation);
             break;
-        case GLFW_KEY_C:
-            double effectiveTime;
-            pose_sensor.change_pose_origin(node_name, effectiveTime);
-            std::cout << std::endl;
-            std::cout << "Effective Time: " << effectiveTime << std::endl;;
+        //case GLFW_KEY_C:
+        //    double effectiveTime;
+        //    pose_sensor.change_pose_origin(node_name, effectiveTime);
+        //    std::cout << std::endl;
+        //    std::cout << "Effective Time: " << effectiveTime << std::endl;;
+        //    break;
+        case GLFW_KEY_M: 
+        {
+            try {
+                pose_sensor.stop();
+                //pipe.stop();
+                std::async(std::launch::async, [&](){
+                    auto data = pose_sensor.export_localization_map();
+                    auto filename = "map.raw";
+                    bin_file_from_bytes(filename, data);
+                    std::cout << "export localization map to file " << filename << " done. " << std::endl;
+                }).wait();
+                app.close();
+            }
+            catch (...) {
+                std::cout << "fail export localization map" << std::endl;
+            }
             break;
+        }
         case GLFW_KEY_ESCAPE:
         case GLFW_KEY_Q:
-            pipe.stop();
+            //pipe.stop();
+            pose_sensor.stop();
             app.close();
             break;
         }
