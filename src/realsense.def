@@ -309,6 +309,8 @@ EXPORTS
     rs2_export_localization_map
     rs2_set_static_node
     rs2_get_static_node
+    rs2_set_pose_origin_node
+    rs2_set_pose_origin_map_id
     rs2_load_wheel_odometry_config
     rs2_send_wheel_odometry
     rs2_get_processing_block
