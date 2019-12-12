@@ -94,6 +94,8 @@ namespace perc
         SLAM_APPEND_CALIBRATION = 0x100C,
         SLAM_CALIBRATION = 0x100D,
         SLAM_RELOCALIZATION_EVENT = 0x100E,
+        SLAM_SET_ORIGIN_NODE = 0x100F,
+        SLAM_SET_ORIGIN_MAP_ID = 0x1010,
 
         /* Controller messages */
         CONTROLLER_POSE_CONTROL = 0x2002,
@@ -1086,6 +1088,22 @@ namespace perc
         bulk_message_response_header header; /**< Message response header: dwLength = 36 byte, wMessageID = SLAM_GET_STATIC_NODE */
         static_node_data data;               /**< Static node data                                                               */
     } bulk_message_response_get_static_node;
+
+    /**
+     * @brief Bulk Change Origin Message
+     *
+     * Change pose origin relative to a static node pose
+     */
+    typedef struct {
+        bulk_message_request_header header; /**< Message request header: dwLength = 136 bytes, wMessageID = SLAM_SET_ORIGIN                      */
+        uint16_t wMapId;                    /**< map id                                                                                         */
+        uint8_t bGuid[MAX_GUID_LENGTH];     /**< Null-terminated C-string, with max length 127 bytes plus one byte for the terminating null character */
+    } bulk_message_request_set_origin;
+
+    typedef struct {
+        bulk_message_response_header header; /**< Message response header: dwLength = 36 byte, wMessageID = SLAM_SET_ORIGIN */
+        uint64_t effectiveTime;              /**< Effective Time                                                               */
+    } bulk_message_response_set_origin;
 
     /**
     * @brief Bulk SLAM override calibration Message

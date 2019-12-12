@@ -1899,6 +1899,78 @@ namespace perc {
         return fwToHostStatus((MESSAGE_STATUS)response.header.wStatus);
     }
 
+    Status Device::SetPoseOrigin(uint16_t mapId, double_t& effectiveTime)
+    {
+        bulk_message_request_set_origin request = { 0 };
+        bulk_message_response_set_origin response = { 0 };
+
+        request.header.wMessageID = SLAM_SET_ORIGIN_MAP_ID;
+        request.header.dwLength = sizeof(request);
+        request.wMapId = mapId;
+
+        Bulk_Message msg((uint8_t*)&request, request.header.dwLength, (uint8_t*)&response, sizeof(response), mEndpointBulkMessages | TO_DEVICE, mEndpointBulkMessages | TO_HOST);
+
+        mDispatcher->sendMessage(&mFsm, msg);
+        // ERROR_FW_INTERNAL just means we were unable to get the node
+        if (msg.Result == toUnderlying(Status::ERROR_FW_INTERNAL))
+        {
+            return Status::ERROR_FW_INTERNAL;
+        }
+        if (msg.Result != toUnderlying(Status::SUCCESS))
+        {
+            DEVICELOGE("USB Error (0x%X)", msg.Result);
+            return Status::ERROR_USB_TRANSFER;
+        }
+
+        auto llEffectiveTime = response.effectiveTime + mTM2CorrelatedTimeStampShift;
+        auto sys_ts_double_nanos = std::chrono::duration<double, std::nano>(llEffectiveTime);
+        std::chrono::duration<double, std::milli> system_ts_ms(sys_ts_double_nanos);
+        effectiveTime = system_ts_ms.count();
+
+        DEVICELOGD("Change pose origin: Map ID [%d], effective time [%lu]", mapId, response.effectiveTime);
+
+        return fwToHostStatus((MESSAGE_STATUS)response.header.wStatus);
+    }
+
+    Status Device::SetPoseOrigin(const char* guid, double_t& effectiveTime)
+    {
+        bulk_message_request_set_origin request = { 0 };
+        bulk_message_response_set_origin response = { 0 };
+
+        request.header.wMessageID = SLAM_SET_ORIGIN_NODE;
+        request.header.dwLength = sizeof(request);
+        auto length = perc::stringLength(guid, MAX_GUID_LENGTH);
+        if (length > (MAX_GUID_LENGTH - 1))
+        {
+            DEVICELOGE("Error: guid length is too big, max length = %d", (MAX_GUID_LENGTH - 1));
+            return Status::ERROR_PARAMETER_INVALID;
+        }
+        snprintf((char*)request.bGuid, length + 1, "%s", guid);
+
+        Bulk_Message msg((uint8_t*)&request, request.header.dwLength, (uint8_t*)&response, sizeof(response), mEndpointBulkMessages | TO_DEVICE, mEndpointBulkMessages | TO_HOST);
+
+        mDispatcher->sendMessage(&mFsm, msg);
+        // ERROR_FW_INTERNAL just means we were unable to get the node
+        if (msg.Result == toUnderlying(Status::ERROR_FW_INTERNAL))
+        {
+            return Status::ERROR_FW_INTERNAL;
+        }
+        if (msg.Result != toUnderlying(Status::SUCCESS))
+        {
+            DEVICELOGE("USB Error (0x%X)", msg.Result);
+            return Status::ERROR_USB_TRANSFER;
+        }
+
+        auto llEffectiveTime = response.effectiveTime + mTM2CorrelatedTimeStampShift;
+        auto sys_ts_double_nanos = std::chrono::duration<double, std::nano>(llEffectiveTime);
+        std::chrono::duration<double, std::milli> system_ts_ms(sys_ts_double_nanos);
+        effectiveTime = system_ts_ms.count();
+
+        DEVICELOGD("Change pose origin: node guid [%s], effective time [%lu]", guid, response.effectiveTime);
+
+        return fwToHostStatus((MESSAGE_STATUS)response.header.wStatus);
+    }
+
     Status Device::SetCalibration(const TrackingData::CalibrationData& calibrationData)
     {
         if (calibrationData.length > MAX_SLAM_CALIBRATION_SIZE)
@@ -3872,7 +3944,41 @@ namespace perc {
     DEFINE_FSM_ACTION(Device, ASYNC_STATE, ON_ASYNC_START, msg)
     {
         DEVICELOGE("State [ASYNC_STATE] got event [ON_ASYNC_START] ==> [ERROR_STATE]");
-        msg.Result = toUnderlying(Status::SUCCESS);
+        //msg.Result = toUnderlying(Status::SUCCESS);
+        MessageON_ASYNC_START pMsg = dynamic_cast<const MessageON_ASYNC_START&>(msg);
+        switch (pMsg.mMessageId)
+        {
+        case SLAM_GET_LOCALIZATION_DATA:
+        {
+            bulk_message_request_get_localization_data request = { 0 };
+            bulk_message_response_get_localization_data response = { 0 };
+
+            mListener = pMsg.mListener;
+            request.header.wMessageID = pMsg.mMessageId;
+            request.header.dwLength = sizeof(request);
+
+            DEVICELOGD("Get Localization Data");
+
+            Bulk_Message bulkMsg((uint8_t*)&request, request.header.dwLength, (uint8_t*)&response, sizeof(response), mEndpointBulkMessages | TO_DEVICE, mEndpointBulkMessages | TO_HOST);
+            onBulkMessage(bulkMsg);
+
+            if (bulkMsg.Result != toUnderlying(Status::SUCCESS))
+            {
+                DEVICELOGE("USB Error (0x%X)", bulkMsg.Result);
+                msg.Result = toUnderlying(Status::ERROR_USB_TRANSFER);
+                return;
+            }
+
+            msg.Result = response.header.wStatus;
+            break;
+        }
+
+        case SLAM_SET_LOCALIZATION_DATA_STREAM:
+        {
+            SendLargeMessage(msg);
+        }
+        }
+
     }
 
     DEFINE_FSM_ACTION(Device, ASYNC_STATE, ON_ASYNC_STOP, msg)
@@ -4287,6 +4393,39 @@ namespace perc {
     {
         DEVICELOGE("State [ACTIVE_STATE] got event [ON_ASYNC_START] ==> [ERROR_STATE]");
         msg.Result = toUnderlying(Status::SUCCESS);
+        MessageON_ASYNC_START pMsg = dynamic_cast<const MessageON_ASYNC_START&>(msg);
+        switch (pMsg.mMessageId)
+        {
+        case SLAM_GET_LOCALIZATION_DATA:
+        {
+            bulk_message_request_get_localization_data request = { 0 };
+            bulk_message_response_get_localization_data response = { 0 };
+
+            mListener = pMsg.mListener;
+            request.header.wMessageID = pMsg.mMessageId;
+            request.header.dwLength = sizeof(request);
+
+            DEVICELOGD("Get Localization Data");
+
+            Bulk_Message bulkMsg((uint8_t*)&request, request.header.dwLength, (uint8_t*)&response, sizeof(response), mEndpointBulkMessages | TO_DEVICE, mEndpointBulkMessages | TO_HOST);
+            onBulkMessage(bulkMsg);
+
+            if (bulkMsg.Result != toUnderlying(Status::SUCCESS))
+            {
+                DEVICELOGE("USB Error (0x%X)", bulkMsg.Result);
+                msg.Result = toUnderlying(Status::ERROR_USB_TRANSFER);
+                return;
+            }
+
+            msg.Result = response.header.wStatus;
+            break;
+        }
+
+        case SLAM_SET_LOCALIZATION_DATA_STREAM:
+        {
+            SendLargeMessage(msg);
+        }
+        }
     }
 
     DEFINE_FSM_ACTION(Device, ACTIVE_STATE, ON_ASYNC_STOP, msg)
