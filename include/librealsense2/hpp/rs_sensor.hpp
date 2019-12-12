@@ -532,6 +532,22 @@ namespace rs2
             return !!res;
         }
 
+        bool set_pose_origin(const std::string& guid, double& effective_time) const
+        {
+            rs2_error* e = nullptr;
+            auto res = rs2_set_pose_origin_node(_sensor.get(), guid.c_str(), &effective_time, &e);
+            error::handle(e);
+            return !!res;
+        }
+
+        bool set_pose_origin(const uint16_t mapId, double& effective_time) const
+        {
+            rs2_error* e = nullptr;
+            auto res = rs2_set_pose_origin_map_id(_sensor.get(), mapId, &effective_time, &e);
+            error::handle(e);
+            return !!res;
+        }
+
         operator bool() const { return _sensor.get() != nullptr; }
         explicit pose_sensor(std::shared_ptr<rs2_sensor> dev) : pose_sensor(sensor(dev)) {}
     };
