@@ -2431,6 +2431,27 @@ int rs2_get_static_node(const rs2_sensor* sensor, const char* guid, rs2_vector *
 }
 HANDLE_EXCEPTIONS_AND_RETURN(0, sensor, guid, pos, orient)
 
+int rs2_set_pose_origin_node(const rs2_sensor* sensor, const char* guid, double* effective_time, rs2_error** error) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL(sensor);
+    VALIDATE_NOT_NULL(guid);
+
+    auto pose_snr = VALIDATE_INTERFACE(sensor->sensor, librealsense::pose_sensor_interface);
+    std::string s_guid(guid);
+    return int(pose_snr->set_pose_origin(s_guid, *effective_time));
+}
+HANDLE_EXCEPTIONS_AND_RETURN(-1, sensor, guid)
+
+int rs2_set_pose_origin_map_id(const rs2_sensor* sensor, const uint16_t mapId, double* effective_time, rs2_error** error) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL(sensor);
+
+    auto pose_snr = VALIDATE_INTERFACE(sensor->sensor, librealsense::pose_sensor_interface);
+    return int(pose_snr->set_pose_origin(mapId, *effective_time));
+}
+HANDLE_EXCEPTIONS_AND_RETURN(-1, sensor, mapId)
+
+
 int rs2_load_wheel_odometry_config(const rs2_sensor* sensor, const unsigned char* odometry_blob, unsigned int blob_size, rs2_error** error) BEGIN_API_CALL
 {
     VALIDATE_NOT_NULL(sensor);
