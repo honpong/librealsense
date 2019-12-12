@@ -1747,6 +1747,51 @@ namespace librealsense
         return true;
     }
 
+    bool tm2_sensor::set_pose_origin(const std::string& guid, double& effective_time) const
+    {
+        bulk_message_request_set_origin request = {{ sizeof(request), SLAM_SET_ORIGIN_NODE }};
+        strncpy((char *)&request.bGuid[0], guid.c_str(), MAX_GUID_LENGTH-1);
+        bulk_message_response_set_origin response = {};
+
+        _device->bulk_request_response(request, response, sizeof(response), false);
+        if(response.header.wStatus == INTERNAL_ERROR)
+            return false; // Failed to set pose origin to static node
+        else if(response.header.wStatus != SUCCESS) {
+            LOG_ERROR("Error: " << status_name(response.header) << " set pose origin to static node");
+            return false;
+        }
+        
+        auto llEffectiveTime = response.effectiveTime + mTM2CorrelatedTimeStampShift;
+        auto sys_ts_double_nanos = std::chrono::duration<double, std::nano>(llEffectiveTime);
+        std::chrono::duration<double, std::milli> system_ts_ms(sys_ts_double_nanos);
+        effectiveTime = system_ts_ms.count();
+
+        LOG_INFO("Set pose origin: node guid " << guid << ", effective time " << response.effectiveTime);
+        return true;
+    }
+
+    bool tm2_sensor::set_pose_origin(const uint16_t mapId, double& effective_time) const
+    {
+        bulk_message_request_set_origin request = {{ sizeof(request), SLAM_SET_ORIGIN_MAP_ID }};
+        request.wMapId = mapId;
+        bulk_message_response_set_origin response = {};
+        
+        _device->bulk_request_response(request, response, sizeof(response), false);
+        if(response.header.wStatus == INTERNAL_ERROR)
+            return false; // Failed to set pose origin to static node
+        else if(response.header.wStatus != SUCCESS) {
+            LOG_ERROR("Error: " << status_name(response.header) << " set pose origin to map ID");
+            return false;
+        }
+        
+        auto llEffectiveTime = response.effectiveTime + mTM2CorrelatedTimeStampShift;
+        auto sys_ts_double_nanos = std::chrono::duration<double, std::nano>(llEffectiveTime);
+        std::chrono::duration<double, std::milli> system_ts_ms(sys_ts_double_nanos);
+        effectiveTime = system_ts_ms.count();
+
+        LOG_INFO("Set pose origin: Map ID " << mapID, ", effective time " << response.effectiveTime);
+        return true;
+    }
 
     bool tm2_sensor::load_wheel_odometery_config(const std::vector<uint8_t>& odometry_config_buf) const
     {
