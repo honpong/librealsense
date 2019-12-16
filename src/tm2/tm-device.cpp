@@ -1761,10 +1761,10 @@ namespace librealsense
             return false;
         }
         
-        auto llEffectiveTime = response.effectiveTime + mTM2CorrelatedTimeStampShift;
+        auto llEffectiveTime = response.effectiveTime; //mTM2CorrelatedTimeStampShift;
         auto sys_ts_double_nanos = std::chrono::duration<double, std::nano>(llEffectiveTime);
         std::chrono::duration<double, std::milli> system_ts_ms(sys_ts_double_nanos);
-        effectiveTime = system_ts_ms.count();
+        effective_time = system_ts_ms.count();
 
         LOG_INFO("Set pose origin: node guid " << guid << ", effective time " << response.effectiveTime);
         return true;
@@ -1784,12 +1784,12 @@ namespace librealsense
             return false;
         }
         
-        auto llEffectiveTime = response.effectiveTime + mTM2CorrelatedTimeStampShift;
+        auto llEffectiveTime = response.effectiveTime; //mTM2CorrelatedTimeStampShift;
         auto sys_ts_double_nanos = std::chrono::duration<double, std::nano>(llEffectiveTime);
         std::chrono::duration<double, std::milli> system_ts_ms(sys_ts_double_nanos);
-        effectiveTime = system_ts_ms.count();
+        effective_time = system_ts_ms.count();
 
-        LOG_INFO("Set pose origin: Map ID " << mapID, ", effective time " << response.effectiveTime);
+        LOG_INFO("Set pose origin: Map ID " << mapId << ", effective time " << response.effectiveTime);
         return true;
     }
 
