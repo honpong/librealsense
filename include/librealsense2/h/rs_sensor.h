@@ -537,6 +537,18 @@ int rs2_set_static_node(const rs2_sensor* sensor, const char* guid, const rs2_ve
 int rs2_get_static_node(const rs2_sensor* sensor, const char* guid, rs2_vector *pos, rs2_quaternion *orient, rs2_error** error);
 
 /**
+* Get the name list of stages in map
+* \param[in]  sensor    T2xx position-tracking sensor
+* \param[out] linked    A list of flag to indicate stage node is linked or unlinked
+* \param[in]  linked_size linked buffer size
+* \param[out] num_stage number of stages in map
+* \param[out] error     If non-null, receives any error that occurs during this call, otherwise, errors are ignored
+* \return               buffer contain names list
+*/
+const rs2_raw_data_buffer* rs2_get_stage_list(const rs2_sensor* sensor, unsigned char *linked,
+    unsigned int linked_size, int* num_stage, rs2_error** error);
+
+/**
 /* Set output pose origin on a named landmark in the map
 * \param[in]  sensor    T2xx position-tracking sensor
 * \param[in]  guid      Null-terminated string of up to 127 characters
