@@ -531,6 +531,36 @@ namespace rs2
             return !!res;
         }
 
+        std::vector<std::string> get_stage_list(std::vector<uint8_t>& linked, int& num_stage) const
+        {
+            rs2_error* e = nullptr;
+            std::shared_ptr<const rs2_raw_data_buffer> loc_map(
+                rs2_get_stage_list(_sensor.get(), (unsigned char *)linked.data(), uint32_t(linked.size()), &num_stage, &e),
+                rs2_delete_raw_data);
+            error::handle(e);
+
+            std::vector<std::string> stage_list;
+            if (num_stage > 0)
+            {
+                auto start = rs2_get_raw_data(loc_map.get(), &e);
+                error::handle(e);
+
+                if (start)
+                {
+                    auto size = rs2_get_raw_data_size(loc_map.get(), &e);
+                    error::handle(e);
+
+                    int pos = 0;
+                    for (int i = 0; i < num_stage; i++)
+                    {
+                        stage_list.push_back(std::string((char *)(start + pos)));
+                        pos += stage_list[i].size() + 1;
+                    }
+                }
+            }
+            return stage_list;
+        }
+
         bool set_pose_origin(const std::string& guid, double& effective_time) const
         {
             rs2_error* e = nullptr;
