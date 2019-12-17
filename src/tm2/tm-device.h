@@ -100,6 +100,7 @@ namespace librealsense
         bool import_relocalization_map(const std::vector<uint8_t>& lmap_buf) const override;
         bool set_static_node(const std::string& guid, const float3& pos, const float4& orient_quat) const override;
         bool get_static_node(const std::string& guid, float3& pos, float4& orient_quat) const override;
+        std::vector<uint8_t> get_stage_list(std::vector<uint8_t>& linked, int& num_stage) const override;
         bool set_pose_origin(const std::string& guid, double& effective_time) const override;
         bool set_pose_origin(const uint16_t mapId, double& effective_time) const override;
 
