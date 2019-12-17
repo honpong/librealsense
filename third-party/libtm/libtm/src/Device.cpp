@@ -1899,6 +1899,42 @@ namespace perc {
         return fwToHostStatus((MESSAGE_STATUS)response.header.wStatus);
     }
 
+    std::vector<uint8_t> Device::GetStageList(std::vector<uint8_t>& linked, int& num_stage)
+    {
+        bulk_message_request_get_stage_list request = { 0 };
+        bulk_message_response_get_stage_list response = { 0 };
+
+        request.header.wMessageID = SLAM_GET_STAGE_LIST;
+        request.header.dwLength = sizeof(request);
+
+        Bulk_Message msg((uint8_t*)&request, request.header.dwLength, (uint8_t*)&response, sizeof(response), mEndpointBulkMessages | TO_DEVICE, mEndpointBulkMessages | TO_HOST);
+
+        mDispatcher->sendMessage(&mFsm, msg);
+
+        num_stage = -1;
+        std::vector<uint8_t> names;
+        // ERROR_FW_INTERNAL just means we were unable to get the node
+        if (msg.Result == toUnderlying(Status::ERROR_FW_INTERNAL))
+        {
+            return names;
+        }
+        if (msg.Result != toUnderlying(Status::SUCCESS))
+        {
+            DEVICELOGE("USB Error (0x%X)", msg.Result);
+            return names;
+        }
+
+        num_stage = std::min((int)linked.size(), (int)response.dwNumStage);
+        if (num_stage > 0)
+        {
+            std::copy(response.bLinked, response.bLinked + num_stage, linked.begin());
+            int storage_size = response.header.dwLength - sizeof(bulk_message_response_header) - 4 - MAX_NUM_STAGE;
+            names.resize(storage_size);
+            std::copy(response.bGuid, response.bGuid + storage_size, names.begin());
+        }
+        return names;
+    }
+
     Status Device::SetPoseOrigin(uint16_t mapId, double_t& effectiveTime)
     {
         bulk_message_request_set_origin request = { 0 };

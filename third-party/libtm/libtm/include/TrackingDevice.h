@@ -4,6 +4,7 @@
 #pragma once
 #include "TrackingCommon.h"
 #include "TrackingData.h"
+#include <vector>
 
 #define IN
 #define OUT
@@ -436,6 +437,12 @@ namespace perc
         * @return Status
         */
         virtual Status GetStaticNode(IN const char* guid, OUT TrackingData::RelativePose& relativePose) = 0;
+
+        /**
+        * @brief GetStageList
+        * @return names of stage list
+        */
+        virtual std::vector<uint8_t> GetStageList(std::vector<uint8_t>& linked, int& num_stage) = 0;
 
         /**
         * @brief SetPoseOrigin
