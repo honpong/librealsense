@@ -114,6 +114,18 @@ int main(int argc, char * argv[]) try
                 std::cout << "Saving relocalization map to: " << save_map << std::endl;
             }
             break;
+        case GLFW_KEY_L:
+            {
+                std::vector<uint8_t> linked(128);
+                int num_stage = -1;
+                auto names = pose_sensor.get_stage_list(linked, num_stage);
+                printf("\n");
+                for (int i = 0; i < num_stage; i++)
+                {
+                    printf("%s %d\n", names[i].c_str(), linked[i]);
+                }
+            }
+            break;
         case GLFW_KEY_ESCAPE:
         case GLFW_KEY_Q:
             pipe.stop();
