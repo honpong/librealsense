@@ -1534,6 +1534,14 @@ namespace librealsense
         throw io_exception(to_string() << "Unexpected error getting static node, status = " << (uint32_t)status);
     }
 
+    std::vector<uint8_t> tm2_sensor::get_stage_list(std::vector<uint8_t>& linked, int& num_stage) const
+    {
+        if (!_tm_dev)
+            throw wrong_api_call_sequence_exception("T2xx tracking device is not available");
+
+        return _tm_dev->GetStageList(linked, num_stage);
+    }
+
     bool tm2_sensor::set_pose_origin(const std::string& guid, double& effective_time) const
     {
         if (!_tm_dev)
