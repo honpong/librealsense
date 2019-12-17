@@ -34,6 +34,9 @@
 #define MAX_GUID_LENGTH 128
 #define MAX_FW_UPDATE_FILE_COUNT 6
 #define MAX_SLAM_CALIBRATION_SIZE 10000
+#define MAX_STAGE_LIST_MESSAGE_LEN 4096
+#define MAX_NUM_STAGE 128
+#define MAX_STAGE_NAME_BUF_LEN (MAX_STAGE_LIST_MESSAGE_LEN - sizeof(bulk_message_request_header) - MAX_NUM_STAGE - 4)
 
 // Added from TrackingCommon.h
 namespace t265
@@ -163,6 +166,7 @@ namespace t265
         SLAM_RELOCALIZATION_EVENT = 0x100E,
         SLAM_SET_ORIGIN_NODE = 0x100F,
         SLAM_SET_ORIGIN_MAP_ID = 0x1010,
+        SLAM_GET_STAGE_LIST = 0x1011,
 
         /* Error messages */
         DEV_ERROR = 0x8000,
@@ -1075,6 +1079,22 @@ namespace t265
         uint64_t effectiveTime;              /**< Effective Time                                                               */
     } bulk_message_response_set_origin;
     
+    /**
+     * @brief Bulk Get Stage List Message
+     *
+     * Get Stage List
+     */
+    typedef struct {
+        bulk_message_request_header header;
+    } bulk_message_request_get_stage_list;
+
+    typedef struct {
+        bulk_message_response_header header;
+        int32_t        dwNumStage;
+        uint8_t        bLinked[MAX_NUM_STAGE];
+        uint8_t        bGuid[MAX_STAGE_NAME_BUF_LEN];
+    } bulk_message_response_get_stage_list;
+
     /**
     * @brief Bulk SLAM override calibration Message
     *

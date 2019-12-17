@@ -1747,6 +1747,34 @@ namespace librealsense
         return true;
     }
 
+    std::vector<uint8_t> tm2_sensor::get_stage_list(std::vector<uint8_t>& linked, int& num_stage) const
+    {
+        bulk_message_request_get_stage_list request = {{sizeof(request), SLAM_GET_STAGE_LIST}};
+        bulk_message_response_get_stage_list response = { 0 };
+
+        num_stage = -1;
+        std::vector<uint8_t> names;
+
+        _device->bulk_request_response(request, response, sizeof(response), false);
+        if(response.header.wStatus == INTERNAL_ERROR)
+            return names; // Failed to get stage list
+        else if(response.header.wStatus != SUCCESS) {
+            LOG_ERROR("Error: " << status_name(response.header) << " get stage list");
+            return names;
+        }
+        
+        num_stage = std::min((int)linked.size(), (int)response.dwNumStage);
+        if (num_stage > 0)
+        {
+            std::copy(response.bLinked, response.bLinked + num_stage, linked.begin());
+            int storage_size = response.header.dwLength - sizeof(bulk_message_response_header) - 4 - MAX_NUM_STAGE;
+            names.resize(storage_size);
+            std::copy(response.bGuid, response.bGuid + storage_size, names.begin());
+        }
+        
+        return names;
+    }
+
     bool tm2_sensor::set_pose_origin(const std::string& guid, double& effective_time) const
     {
         bulk_message_request_set_origin request = {{ sizeof(request), SLAM_SET_ORIGIN_NODE }};
