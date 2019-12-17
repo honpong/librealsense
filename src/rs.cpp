@@ -2431,6 +2431,24 @@ int rs2_get_static_node(const rs2_sensor* sensor, const char* guid, rs2_vector *
 }
 HANDLE_EXCEPTIONS_AND_RETURN(0, sensor, guid, pos, orient)
 
+const rs2_raw_data_buffer* rs2_get_stage_list(const rs2_sensor* sensor, unsigned char *linked,
+    unsigned int linked_size, int* num_stage, rs2_error** error) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL(sensor);
+    VALIDATE_NOT_NULL(linked);
+    std::vector<uint8_t> linked_to_send(linked_size);
+    auto pose_snr = VALIDATE_INTERFACE(sensor->sensor, librealsense::pose_sensor_interface);
+    auto names = pose_snr->get_stage_list(linked_to_send, *num_stage);
+    if (*num_stage > 0)
+    {
+        memcpy(linked, linked_to_send.data(), *num_stage);
+        return new rs2_raw_data_buffer{ names };
+    }
+
+    return (rs2_raw_data_buffer*)nullptr;
+}
+HANDLE_EXCEPTIONS_AND_RETURN(nullptr, sensor, linked)
+
 int rs2_set_pose_origin_node(const rs2_sensor* sensor, const char* guid, double* effective_time, rs2_error** error) BEGIN_API_CALL
 {
     VALIDATE_NOT_NULL(sensor);
