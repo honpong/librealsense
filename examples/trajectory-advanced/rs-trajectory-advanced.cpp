@@ -447,6 +447,12 @@ public:
         };
         load_map();
     }
+    virtual ~map_manager() {
+        if (is_save_map_on_exit) { 
+            _pipe.stop(); 
+            save_map();
+        }
+    }
     void save_pose_as_static_node(){ printf("save pose as static node\n"); nodes.push_back(last_pose); }
     void clear_static_nodes(){ printf("clear static nodes\n"); nodes.clear();}
     void load_map() {
@@ -503,8 +509,9 @@ public:
         switch(key){
             case 'a': case 65: save_pose_as_static_node(); break;
             case 'c': case 67: clear_static_nodes();       break;
-            case 'l': case 76: load_map();                 break;
-            case 's': case 77: save_map();                 break;
+            case 'l': case 76: load_nodes();               break;
+            case 's': case 83: save_map();                 break;
+            case 'o': set_save_map_on_exit();              break;
             case 'q': case 81: _app.close();               break;
         }
     }
@@ -547,6 +554,7 @@ private:
     std::function<void(int)> old_key_release;
     std::pair<rs2_pose,tracked_point> last_pose;
     std::vector<std::pair<rs2_pose,tracked_point>> nodes;
+    bool is_save_map_on_exit = false;
 };
 
 // In this example, we show how to track the camera's motion using a T265 device
@@ -594,7 +602,6 @@ int main(int argc, char * argv[]) try
         // Draw the trajectory from different perspectives
         screen_renderer.draw_windows(app.width(), app.height(), app_state, r);
     }
-
     return EXIT_SUCCESS;
 }
 catch (const rs2::error & e)
