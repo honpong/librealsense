@@ -1,0 +1,4 @@
+[submodule "examples/slam/tracker"]
+	path = examples/slam/tracker
+	url = https://github.com/honpong/tracker.git
+	branch = libRS_wrapper
