@@ -143,6 +143,7 @@ int main(int c, char * v[]) try
     if (playback_file)
         cfg.enable_device_from_file(playback_file);
     else for (const rs2::device &d : ctx.query_devices()) {
+        /**
         const char *d_serial = d.supports(RS2_CAMERA_INFO_SERIAL_NUMBER) ? d.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER) : nullptr;
         if (serial && (!d_serial || 0 != strcmp(serial, d_serial)))
             continue;
@@ -158,12 +159,20 @@ int main(int c, char * v[]) try
                 else if (p.stream_type() == RS2_STREAM_POSE)                  cfg.enable_stream(RS2_STREAM_POSE,     p.stream_index()); // This is just configured for the sake of the pose reference
             }
         }
+         */
+        
+        cfg.enable_stream(RS2_STREAM_GYRO);
+        cfg.enable_stream(RS2_STREAM_ACCEL);
+        cfg.enable_stream(RS2_STREAM_FISHEYE, 1);
+        cfg.enable_stream(RS2_STREAM_FISHEYE, 2);
+        cfg.enable_stream(RS2_STREAM_POSE);
+        
         break;
     }
 
     rs2::pipeline_profile pipeline_profile = cfg.resolve(pipe);
 
-    {
+    if(false){
         bool has_depth = false;
         for (rs2::stream_profile &p : pipeline_profile.get_streams())
             if (p.stream_type() == RS2_STREAM_DEPTH)
