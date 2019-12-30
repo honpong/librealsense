@@ -5,6 +5,8 @@ cmake_minimum_required(VERSION 3.1.0)
 
 project(rs-slam)
 
+add_subdirectory(tracker/src)
+
 find_package(tracker QUIET)
 if (NOT TARGET tracker)
     return()
