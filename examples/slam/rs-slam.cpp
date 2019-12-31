@@ -14,6 +14,7 @@
 #include <cstring>
 #include <unistd.h>
 #include "rc_tracker.h"
+#include <future>
 
 struct to_string {
     std::ostringstream ss;
@@ -141,7 +142,7 @@ int main(int c, char * v[]) try
         std::cout << dev.get_info(RS2_CAMERA_INFO_NAME) << "\n";
 
     if (playback_file)
-        cfg.enable_device_from_file(playback_file);
+        cfg.enable_device_from_file(playback_file, false);
     else for (const rs2::device &d : ctx.query_devices()) {
         /**
         const char *d_serial = d.supports(RS2_CAMERA_INFO_SERIAL_NUMBER) ? d.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER) : nullptr;
@@ -203,7 +204,7 @@ int main(int c, char * v[]) try
 
     std::unordered_map<int,int> sensor_id;
 
-    rc_setMessageCallback(rc.get(), [](void *handle, rc_MessageLevel message_level, const char *message, size_t len) { std::cout.write(message,len); }, nullptr, rc_MESSAGE_INFO);
+    rc_setMessageCallback(rc.get(), [](void *handle, rc_MessageLevel message_level, const char *message, size_t len) { std::cout.write(message,len); }, nullptr, rc_MESSAGE_INFO /**rc_MESSAGE_INFO**/);
 
     rs2::stream_profile ref; try { ref = pipeline_profile.get_stream(RS2_STREAM_POSE); } catch (...) { ref = pipeline_profile.get_stream(RS2_STREAM_ACCEL); };
 
@@ -286,7 +287,7 @@ int main(int c, char * v[]) try
             std::ofstream(calibration_json) << json << "\n";
     }
 
-    rc_configureQueueStrategy(rc.get(), rc_QUEUE_MINIMIZE_LATENCY);
+    rc_configureQueueStrategy(rc.get(), rc_QUEUE_MINIMIZE_DROPS /*rc_QUEUE_MINIMIZE_LATENCY*/);
 
     rs2::software_device dev;
     struct rc_software_pose {
@@ -342,11 +343,11 @@ int main(int c, char * v[]) try
     };
     rc_setDataCallback(rc.get(), [](void *handle, rc_Tracker *tracker, const rc_Data *data) {
         auto &fs = *(struct fast_slow*)handle;
-        if      (data->path == rc_DATA_PATH_FAST) rc_software_pose::data_callback((void*)&fs.fast, tracker, data);
-        else if (data->path == rc_DATA_PATH_SLOW) rc_software_pose::data_callback((void*)&fs.slow, tracker, data);
+        //if      (data->path == rc_DATA_PATH_FAST) rc_software_pose::data_callback((void*)&fs.fast, tracker, data);
+        //else if (data->path == rc_DATA_PATH_SLOW) rc_software_pose::data_callback((void*)&fs.slow, tracker, data);
     }, (void *)&fast_slow);
 
-    dev.add_to(ctx);
+    //dev.add_to(ctx);
 
     // either or both of these
     if (recording_file) rc_startCapture(rc.get(), rc_RUN_ASYNCHRONOUS, [](void *handle, const void *buffer, size_t length) {
@@ -356,20 +357,33 @@ int main(int c, char * v[]) try
             delete (std::ofstream*)handle;
     }, (void*)new std::ofstream(recording_file, std::ios::binary));
     //rc_setOutputLog(rc.get(), "/tmp/t.rc", rc_RUN_ASYNCHRONOUS);
-    if (track) rc_startTracker(rc.get(), rc_RUN_ASYNCHRONOUS | rc_RUN_FAST_PATH | rc_RUN_RELOCALIZATION | rc_RUN_POSE_JUMP);
+    if (track) rc_startTracker(rc.get(), rc_RUN_SYNCHRONOUS | rc_RUN_FAST_PATH | rc_RUN_RELOCALIZATION | rc_RUN_POSE_JUMP);
 
     pipe.start(cfg, [&rc,&sensor_id, &use_depth](const rs2::frame& frame) {
         try {
+            
+            if(frame.is<rs2::frameset>()){
+                frame.as<rs2::frameset>().foreach_rs([](const rs2::frame& f){
+                    printf("frame (set) number %llu %f %s %d\n", f.get_frame_number(), f.get_timestamp(), rs2_format_to_string(f.get_profile().format()), f.get_profile().stream_index());
+                });
+            }else{ printf("frame (   ) number %llu %f %s\n", frame.get_frame_number(), frame.get_timestamp(), rs2_format_to_string(frame.get_profile().format())); }
+            
         if (frame.is<rs2::frameset>()) {
             auto fs = frame.as<rs2::frameset>();
             for (auto fi = fs.begin(), ni=fi; fi != fs.end(); ++fi) {
                 rs2::frame f = (*fi);
+                
                 rs2::frame n; if (++(ni=fi) != fs.end()) n = *ni;
                 rs2::stream_profile fp = f.get_profile();
                 rs2::stream_profile np; if (n) np = n.get_profile();
                 if (fp.format() == RS2_FORMAT_Y8 && np && np.format() == RS2_FORMAT_Y8) {
                     auto f0 = f.as<rs2::video_frame>(); auto p0 = fp.as<rs2::video_stream_profile>(); auto id0 = sensor_id[p0.unique_id()];
                     auto f1 = n.as<rs2::video_frame>(); auto p1 = np.as<rs2::video_stream_profile>(); auto id1 = sensor_id[p1.unique_id()];
+                    if(f0.get_timestamp()!=f1.get_timestamp()){
+                        printf("timestamp mismatch %f %f\n", f0.get_timestamp(), f1.get_timestamp());
+                        //printf("frameset size %d\n",fs.size());
+                        continue;
+                    }
                     assert(id0/2 == id1/2 && f0.get_timestamp() == f1.get_timestamp() && f0.get_width() == f1.get_width() && f0.get_height() == f1.get_height());
                     if (is_emitter_on(f0) || is_emitter_on(f1)) std::cout << "    skipping stereo pair with emitter on\n"; else
                     if (!rc_receiveStereo(rc.get(), id0/2, rc_FORMAT_GRAY8,
@@ -432,10 +446,44 @@ int main(int c, char * v[]) try
 
     if (record_time_s)
         std::this_thread::sleep_for(std::chrono::milliseconds(uint64_t(1000*record_time_s)));
-    else if (isatty(STDIN_FILENO))
-        { std::cerr << "press return to finish recording:"; std::getchar(); }
-
+    else if (isatty(STDIN_FILENO)){
+        //std::cerr << "press return to finish recording:"; std::getchar();
+    }
+   
+    auto pb = pipe.get_active_profile().get_device().as<rs2::playback>();
+    for(bool firstframe=false; pb && (!firstframe || pb.current_status()==RS2_PLAYBACK_STATUS_PLAYING);){
+        if(pb.current_status()==RS2_PLAYBACK_STATUS_PLAYING){ firstframe = true; }
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
+        
     pipe.stop();
+        
+    struct save_map_t
+    {
+        save_map_t(rc_Tracker* tracker, std::string filename) {
+            outfile.open(filename, std::ios_base::binary);
+            if(!outfile.fail()){
+                std::cout << " writing map file " << filename << std::endl;
+                rc_saveMap(tracker, [](void *handle, const void* buffer, size_t length){
+                    auto* save_map = (save_map_t*)handle;
+                    if(length){
+                        std::cout << "writing " << length << " bytes" << std::endl;
+                        save_map->outfile.write((const char*)buffer, length);
+                    }
+                    else {
+                        save_map->outfile.close();
+                        save_map->task.set_value();
+                    };
+                }, this);
+            }
+            task_done.wait();
+            std::cout << "end writing map file " << std::endl;
+        }
+        std::promise<void> task;
+        std::future<void> task_done = task.get_future();
+        std::ofstream outfile;
+    } save_map(rc.get(), std::string(playback_file) + ".map" );
+
     if (recording_file)
         printf("pipe stoppped; flushing recording\n");
     rc_stopTracker(rc.get());
