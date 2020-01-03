@@ -445,7 +445,7 @@ public:
             old_key_release(key);
             process_key(key);
         };
-        load_map();
+        //load_map();
     }
     void save_pose_as_static_node(){ printf("save pose as static node\n"); nodes.push_back(last_pose); }
     void clear_static_nodes(){ printf("clear static nodes\n"); nodes.clear();}
@@ -507,6 +507,11 @@ public:
         tracker::add_to_trajectory(p);
         // Save latest pose data
         last_pose = {pose_data, p};
+    }
+    float* get_last_r(float r[16])
+    {
+        this->calc_transform(last_pose.first, r);
+        return r;
     }
     virtual void draw_trajectory() override
     {

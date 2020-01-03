@@ -15,6 +15,7 @@
 #include <unistd.h>
 #include "rc_tracker.h"
 #include <future>
+#include "rs-slam-trajectory.hpp"
 
 struct to_string {
     std::ostringstream ss;
@@ -166,7 +167,7 @@ int main(int c, char * v[]) try
         cfg.enable_stream(RS2_STREAM_ACCEL);
         cfg.enable_stream(RS2_STREAM_FISHEYE, 1);
         cfg.enable_stream(RS2_STREAM_FISHEYE, 2);
-        cfg.enable_stream(RS2_STREAM_POSE);
+        //cfg.enable_stream(RS2_STREAM_POSE, RS2_FORMAT_6DOF);
         
         break;
     }
@@ -204,7 +205,7 @@ int main(int c, char * v[]) try
 
     std::unordered_map<int,int> sensor_id;
 
-    rc_setMessageCallback(rc.get(), [](void *handle, rc_MessageLevel message_level, const char *message, size_t len) { std::cout.write(message,len); }, nullptr, rc_MESSAGE_INFO /**rc_MESSAGE_INFO**/);
+    rc_setMessageCallback(rc.get(), [](void *handle, rc_MessageLevel message_level, const char *message, size_t len) { std::cout.write(message,len); }, nullptr, rc_MESSAGE_NONE /**rc_MESSAGE_INFO**/);
 
     rs2::stream_profile ref; try { ref = pipeline_profile.get_stream(RS2_STREAM_POSE); } catch (...) { ref = pipeline_profile.get_stream(RS2_STREAM_ACCEL); };
 
@@ -287,8 +288,9 @@ int main(int c, char * v[]) try
             std::ofstream(calibration_json) << json << "\n";
     }
 
-    rc_configureQueueStrategy(rc.get(), rc_QUEUE_MINIMIZE_DROPS /*rc_QUEUE_MINIMIZE_LATENCY*/);
+    rc_configureQueueStrategy(rc.get(), /*rc_QUEUE_MINIMIZE_DROPS*/ rc_QUEUE_MINIMIZE_LATENCY);
 
+#if 0
     rs2::software_device dev;
     struct rc_software_pose {
         rs2::software_sensor pose_sensor;
@@ -301,7 +303,7 @@ int main(int c, char * v[]) try
               pose_stream(pose_sensor.add_pose_stream({ RS2_STREAM_POSE, 0 /*index???*/, 0 /*unique_id???*/, output_fps, RS2_FORMAT_6DOF })),
               path(path_), output_type(output_type_) {
           pose_stream.register_extrinsics_to(ref, {{1, 0, 0, 0, 1, 0, 0, 0, 1}, {0,0,0}});
-          //pose_sensor.open(pose_stream);
+          pose_sensor.open(pose_stream);
         }
         static void data_callback(void *handle, rc_Tracker *tracker, const rc_Data *data) {
           auto &sp = *(rc_software_pose *)handle;
@@ -335,7 +337,7 @@ int main(int c, char * v[]) try
           }
         }
     };
-
+        
     int output_fps = pipeline_profile.get_stream(RS2_STREAM_GYRO).fps(); // we choose to output pose on the gyro, see rc_setDataCallback
     struct fast_slow { rc_software_pose fast, slow; } fast_slow = {
         {"Fast Pose", dev, ref, output_fps,     rc_SENSOR_TYPE_GYROSCOPE, rc.get(), rc_DATA_PATH_FAST},
@@ -343,12 +345,82 @@ int main(int c, char * v[]) try
     };
     rc_setDataCallback(rc.get(), [](void *handle, rc_Tracker *tracker, const rc_Data *data) {
         auto &fs = *(struct fast_slow*)handle;
-        //if      (data->path == rc_DATA_PATH_FAST) rc_software_pose::data_callback((void*)&fs.fast, tracker, data);
-        //else if (data->path == rc_DATA_PATH_SLOW) rc_software_pose::data_callback((void*)&fs.slow, tracker, data);
+        if      (data->path == rc_DATA_PATH_FAST) rc_software_pose::data_callback((void*)&fs.fast, tracker, data);
+        else if (data->path == rc_DATA_PATH_SLOW) rc_software_pose::data_callback((void*)&fs.slow, tracker, data);
     }, (void *)&fast_slow);
 
     //dev.add_to(ctx);
+#endif
 
+    // Initialize window for rendering
+    window app(1280, 720, "RealSense Trajectory (Advanced) Example");
+        
+    // Construct an object to manage view state
+    glfw_state app_state(0.0, 0.0);
+    // Register callbacks to allow manipulation of the view state
+    register_glfw_callbacks(app, app_state);
+          
+    // Declare RealSense pipeline, encapsulating the actual device and sensors
+    //rs2::pipeline pipe;
+    // Create a configuration for configuring the pipeline with a non default profile
+    //rs2::config cfg;
+    // Add pose stream
+    //cfg.enable_stream(RS2_STREAM_POSE, RS2_FORMAT_6DOF);
+    // Get sensor
+    auto tm_sensor = pipeline_profile.get_device().first<rs2::pose_sensor>();
+    // Create objects for rendering the camera, the trajectory and the split screen
+    camera_renderer cam_renderer;
+    map_manager mmanager(app, pipe, tm_sensor);
+    split_screen_renderer screen_renderer(app.width(), app.height(), mmanager, cam_renderer);
+    
+    struct ui_handles {
+        window* app;
+        glfw_state* app_state;
+        map_manager* mmanager;
+        split_screen_renderer* screen_renderer;
+        float r[16];
+    } hlds{ &app, &app_state, &mmanager, &screen_renderer };
+            
+     rc_setDataCallback(rc.get(), [](void *handle, rc_Tracker *tracker, const rc_Data * data){
+         if (data->type == rc_SENSOR_TYPE_GYROSCOPE && data->path == rc_DATA_PATH_FAST) {
+             rc_PoseVelocity v;
+             rc_PoseAcceleration a;
+             rc_PoseTime pose_time = rc_getPose(tracker, &v, &a, data->path);
+
+             rs2_pose pose_data;
+             pose_data.rotation.w = pose_time.pose_m.Q.w;
+             pose_data.rotation.x = pose_time.pose_m.Q.x;
+             pose_data.rotation.y = pose_time.pose_m.Q.y;
+             pose_data.rotation.z = pose_time.pose_m.Q.z;
+             pose_data.translation.x = pose_time.pose_m.T.x;
+             pose_data.translation.y = pose_time.pose_m.T.y;
+             pose_data.translation.z = pose_time.pose_m.T.z;
+             pose_data.velocity.x = v.T.x;
+             pose_data.velocity.y = v.T.y;
+             pose_data.velocity.z = v.T.z;
+             pose_data.acceleration.x = a.T.x;
+             pose_data.acceleration.y = a.T.y;
+             pose_data.acceleration.z = a.T.z;
+             pose_data.angular_velocity.x = v.W.x;
+             pose_data.angular_velocity.y = v.W.y;
+             pose_data.angular_velocity.z = v.W.z;
+             pose_data.angular_acceleration.x = a.W.x;
+             pose_data.angular_acceleration.y = a.W.y;
+             pose_data.angular_acceleration.z = a.W.z;
+             pose_data.tracker_confidence = rc_getConfidence(tracker);
+             
+             float r[16];
+            auto hlds = (ui_handles*)handle;
+             // Calculate current transformation matrix
+            hlds->mmanager->calc_transform(pose_data, r);
+            // add to trajectory
+            hlds->mmanager->add_to_trajectory(pose_data, r);
+            // Draw the trajectory from different perspectives
+            //hlds->screen_renderer->draw_windows(hlds->app->width(), hlds->app->height(), *hlds->app_state, r);
+         }
+     }, (void *)&hlds);
+
+    
     // either or both of these
     if (recording_file) rc_startCapture(rc.get(), rc_RUN_ASYNCHRONOUS, [](void *handle, const void *buffer, size_t length) {
         if (buffer)
@@ -357,17 +429,40 @@ int main(int c, char * v[]) try
             delete (std::ofstream*)handle;
     }, (void*)new std::ofstream(recording_file, std::ios::binary));
     //rc_setOutputLog(rc.get(), "/tmp/t.rc", rc_RUN_ASYNCHRONOUS);
-    if (track) rc_startTracker(rc.get(), rc_RUN_SYNCHRONOUS | rc_RUN_FAST_PATH | rc_RUN_RELOCALIZATION | rc_RUN_POSE_JUMP);
+    if (track) rc_startTracker(rc.get(), rc_RUN_ASYNCHRONOUS | rc_RUN_FAST_PATH | rc_RUN_RELOCALIZATION | rc_RUN_POSE_JUMP);
 
+    // Start pipeline with chosen configuration
+#if 0
+    pipe.start(cfg);
+        
+    // Main loop
+    while (app)
+    {
+        // Wait for the next set of frames from the camera
+        auto frames = pipe.wait_for_frames();
+        // Get a frame from the pose stream
+        auto f = frames.first_or_default(RS2_STREAM_POSE);
+        // Cast the frame to pose_frame and get its data
+        auto pose_data = f.as<rs2::pose_frame>().get_pose_data();
+
+        float r[16];
+        // Calculate current transformation matrix
+        tracker.calc_transform(pose_data, r);
+        // add to trajectory
+        tracker.add_to_trajectory(pose_data, r);
+        // Draw the trajectory from different perspectives
+        screen_renderer.draw_windows(app.width(), app.height(), app_state, r);
+    }
+#else
     pipe.start(cfg, [&rc,&sensor_id, &use_depth](const rs2::frame& frame) {
         try {
-            
+            /*
             if(frame.is<rs2::frameset>()){
                 frame.as<rs2::frameset>().foreach_rs([](const rs2::frame& f){
                     printf("frame (set) number %llu %f %s %d\n", f.get_frame_number(), f.get_timestamp(), rs2_format_to_string(f.get_profile().format()), f.get_profile().stream_index());
                 });
             }else{ printf("frame (   ) number %llu %f %s\n", frame.get_frame_number(), frame.get_timestamp(), rs2_format_to_string(frame.get_profile().format())); }
-            
+            */
         if (frame.is<rs2::frameset>()) {
             auto fs = frame.as<rs2::frameset>();
             for (auto fi = fs.begin(), ni=fi; fi != fs.end(); ++fi) {
@@ -446,8 +541,17 @@ int main(int c, char * v[]) try
 
     if (record_time_s)
         std::this_thread::sleep_for(std::chrono::milliseconds(uint64_t(1000*record_time_s)));
-    else if (isatty(STDIN_FILENO)){
-        //std::cerr << "press return to finish recording:"; std::getchar();
+    else if (!playback_file && isatty(STDIN_FILENO)){
+        
+        
+        while(app){
+            //hlds->screen_renderer->draw_windows(hlds->app->width(), hlds->app->height(), *hlds->app_state, r);
+            std::this_thread::sleep_for(std::chrono::milliseconds(33));
+            // Draw the trajectory from different perspectives
+            float r[16];
+            screen_renderer.draw_windows(app.width(), app.height(), app_state, mmanager.get_last_r(r));
+        }
+        // std::cerr << "press return to finish recording:"; std::getchar();
     }
    
     auto pb = pipe.get_active_profile().get_device().as<rs2::playback>();
@@ -457,6 +561,8 @@ int main(int c, char * v[]) try
     }
         
     pipe.stop();
+        
+#endif
         
     struct save_map_t
     {
@@ -482,7 +588,7 @@ int main(int c, char * v[]) try
         std::promise<void> task;
         std::future<void> task_done = task.get_future();
         std::ofstream outfile;
-    } save_map(rc.get(), std::string(playback_file) + ".map" );
+    } save_map(rc.get(), std::string(playback_file?playback_file:"temp") + ".map" );
 
     if (recording_file)
         printf("pipe stoppped; flushing recording\n");
