@@ -367,7 +367,10 @@ int main(int c, char * v[]) try
     // Add pose stream
     //cfg.enable_stream(RS2_STREAM_POSE, RS2_FORMAT_6DOF);
     // Get sensor
-    auto tm_sensor = pipeline_profile.get_device().first<rs2::pose_sensor>();
+    std::shared_ptr<rs2::pose_sensor> tm_sensor;
+    if(!playback_file)
+        tm_sensor = std::make_shared<rs2::pose_sensor>(pipeline_profile.get_device().first<rs2::pose_sensor>());
+        
     // Create objects for rendering the camera, the trajectory and the split screen
     camera_renderer cam_renderer;
     map_manager mmanager(app, pipe, tm_sensor);
@@ -541,7 +544,7 @@ int main(int c, char * v[]) try
 
     if (record_time_s)
         std::this_thread::sleep_for(std::chrono::milliseconds(uint64_t(1000*record_time_s)));
-    else if (!playback_file && isatty(STDIN_FILENO)){
+    else if (isatty(STDIN_FILENO)){
         
         
         while(app){

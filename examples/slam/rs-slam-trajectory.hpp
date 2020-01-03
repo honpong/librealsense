@@ -440,7 +440,7 @@ private:
 class map_manager : public tracker
 {
 public:
-    map_manager(window& app, rs2::pipeline& pipe, rs2::pose_sensor& sensor) :  _app(app), _pipe(pipe), tm_sensor(sensor), old_key_release(app.on_key_release){
+    map_manager(window& app, rs2::pipeline& pipe, std::shared_ptr<rs2::pose_sensor>& sensor) :  _app(app), _pipe(pipe), tm_sensor(sensor), old_key_release(app.on_key_release){
         _app.on_key_release = [&](int key){
             old_key_release(key);
             process_key(key);
@@ -450,7 +450,7 @@ public:
     void save_pose_as_static_node(){ printf("save pose as static node\n"); nodes.push_back(last_pose); }
     void clear_static_nodes(){ printf("clear static nodes\n"); nodes.clear();}
     void load_map() {
-        tm_sensor.set_notifications_callback([&](const rs2::notification& n){
+        tm_sensor->set_notifications_callback([&](const rs2::notification& n){
             if(n.get_category()==RS2_NOTIFICATION_CATEGORY_POSE_RELOCALIZATION){load_nodes();}
         });
         
@@ -458,7 +458,7 @@ public:
             std::cout << "loading map from: " << map_file_path << std::endl;
             std::ifstream stream(map_file_path, std::ios::binary);
             std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(stream)), std::istreambuf_iterator<char>());
-            tm_sensor.import_localization_map(bytes);
+            tm_sensor->import_localization_map(bytes);
             std::cout << "map loaded from " << map_file_path << std::endl;
         }catch(std::exception& e){ std::cout << "map loading failed ... " << e.what() << std::endl; }
     }
@@ -468,7 +468,7 @@ public:
             rs2_pose pose = {};
             float r[16];
             unsigned int tracker_conf = 3;
-            if(tm_sensor.get_static_node("node" + std::to_string(i), pose.translation, pose.rotation)){
+            if(tm_sensor->get_static_node("node" + std::to_string(i), pose.translation, pose.rotation)){
                 calc_transform(pose, r);
                 nodes.push_back({pose, tracked_point{rs2_vector{r[12],r[13],r[14]}, tracker_conf}});
                 std::cout << i << " nodes are loaded" << std::endl;
@@ -479,11 +479,11 @@ public:
     void save_map() {
         for(int i=0; i<nodes.size(); ++i){
             try{
-                tm_sensor.set_static_node("node" + std::to_string(i), nodes[i].first.translation, nodes[i].first.rotation);
+                tm_sensor->set_static_node("node" + std::to_string(i), nodes[i].first.translation, nodes[i].first.rotation);
             }catch(...){}
         }
         try{
-            auto bytes = tm_sensor.export_localization_map();
+            auto bytes = tm_sensor->export_localization_map();
             std::ofstream file(map_file_path, std::ios::binary | std::ios::trunc);
             file.write((char*)bytes.data(), bytes.size());
             std::cout << "map exported to " << map_file_path << std::endl;
@@ -538,7 +538,7 @@ public:
 private:
     window& _app;
     rs2::pipeline& _pipe;
-    rs2::pose_sensor tm_sensor;
+    std::shared_ptr<rs2::pose_sensor> tm_sensor;
     std::string map_file_path = "map.raw";
     std::function<void(int)> old_key_release;
     std::pair<rs2_pose,tracked_point> last_pose;
@@ -563,7 +563,7 @@ int main2(int argc, char * argv[]) try
     // Add pose stream
     cfg.enable_stream(RS2_STREAM_POSE, RS2_FORMAT_6DOF);
     // Get sensor
-    auto tm_sensor = cfg.resolve(pipe).get_device().first<rs2::pose_sensor>();
+    auto tm_sensor = std::make_shared<rs2::pose_sensor>(cfg.resolve(pipe).get_device().first<rs2::pose_sensor>());
     // Create objects for rendering the camera, the trajectory and the split screen
     camera_renderer cam_renderer;
     map_manager tracker(app, pipe, tm_sensor);
