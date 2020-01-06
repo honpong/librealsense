@@ -173,6 +173,8 @@ int main(int c, char * v[]) try
     }
 
     rs2::pipeline_profile pipeline_profile = cfg.resolve(pipe);
+    auto pb = pipeline_profile.get_device().as<rs2::playback>();
+    //if(pb){ pb.set_real_time(false); }
 
     if(false){
         bool has_depth = false;
@@ -546,21 +548,19 @@ int main(int c, char * v[]) try
         std::this_thread::sleep_for(std::chrono::milliseconds(uint64_t(1000*record_time_s)));
     else if (isatty(STDIN_FILENO)){
         
-        
-        while(app){
+        bool firstframe = false;
+        auto is_playback_or_live = [&](){
+            if(!pb){ return true; }
+            if(!firstframe && pb.current_status() == RS2_PLAYBACK_STATUS_PLAYING){ return (firstframe = true);}
+            return (!firstframe || pb.current_status() == RS2_PLAYBACK_STATUS_PLAYING);
+        };
+        while(app && is_playback_or_live()){
             //hlds->screen_renderer->draw_windows(hlds->app->width(), hlds->app->height(), *hlds->app_state, r);
             std::this_thread::sleep_for(std::chrono::milliseconds(33));
             // Draw the trajectory from different perspectives
             float r[16];
             screen_renderer.draw_windows(app.width(), app.height(), app_state, mmanager.get_last_r(r));
         }
-        // std::cerr << "press return to finish recording:"; std::getchar();
-    }
-   
-    auto pb = pipe.get_active_profile().get_device().as<rs2::playback>();
-    for(bool firstframe=false; pb && (!firstframe || pb.current_status()==RS2_PLAYBACK_STATUS_PLAYING);){
-        if(pb.current_status()==RS2_PLAYBACK_STATUS_PLAYING){ firstframe = true; }
-        std::this_thread::sleep_for(std::chrono::seconds(1));
     }
         
     pipe.stop();
@@ -597,6 +597,7 @@ int main(int c, char * v[]) try
         printf("pipe stoppped; flushing recording\n");
     rc_stopTracker(rc.get());
 
+    while(pb && app){ std::this_thread::sleep_for(std::chrono::milliseconds(33)); }
     return EXIT_SUCCESS;
 }
 catch (const rs2::error & e)
