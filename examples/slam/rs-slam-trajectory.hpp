@@ -455,12 +455,17 @@ public:
         });
         
         try{
-            std::cout << "loading map from: " << map_file_path << std::endl;
-            std::ifstream stream(map_file_path, std::ios::binary);
+            std::cout << "loading map from: " << in_map_file_path << std::endl;
+            std::ifstream stream(in_map_file_path, std::ios::binary);
             std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(stream)), std::istreambuf_iterator<char>());
-            tm_sensor->import_localization_map(bytes);
-            std::cout << "map loaded from " << map_file_path << std::endl;
-        }catch(std::exception& e){ std::cout << "map loading failed ... " << e.what() << std::endl; }
+            
+            if(bytes.size()){
+                tm_sensor->import_localization_map(bytes);
+                std::cout << "map loaded from " << in_map_file_path << std::endl;
+            }else{
+                std::cout << "file not found : " << in_map_file_path << std::endl; 
+            }
+        }catch(std::exception& e){ std::cout << "map loading failed ... " << e.what() << std::endl; return; }
     }
     void load_nodes(){
         std::cout << "relocalization detected " << std::endl;
@@ -484,9 +489,9 @@ public:
         }
         try{
             auto bytes = tm_sensor->export_localization_map();
-            std::ofstream file(map_file_path, std::ios::binary | std::ios::trunc);
+            std::ofstream file(out_map_file_path, std::ios::binary | std::ios::trunc);
             file.write((char*)bytes.data(), bytes.size());
-            std::cout << "map exported to " << map_file_path << std::endl;
+            std::cout << "map exported to " << out_map_file_path << std::endl;
         }catch(...){}
     }
     void process_key(int key){
@@ -495,7 +500,7 @@ public:
             case 'a': case 65: save_pose_as_static_node(); break;
             case 'c': case 67: clear_static_nodes();       break;
             case 'l': case 76: load_map();                 break;
-            case 's': case 77: save_map();                 break;
+            case 's': case 83: save_map();                 break;
             case 'q': case 81: _app.close();               break;
         }
     }
@@ -535,11 +540,12 @@ public:
         glEnd();
     }
 
-private:
+protected:
     window& _app;
     rs2::pipeline& _pipe;
     std::shared_ptr<rs2::pose_sensor> tm_sensor;
-    std::string map_file_path = "map.raw";
+    std::string in_map_file_path = "map.raw";
+    std::string out_map_file_path = "map.raw";
     std::function<void(int)> old_key_release;
     std::pair<rs2_pose,tracked_point> last_pose;
     std::vector<std::pair<rs2_pose,tracked_point>> nodes;
