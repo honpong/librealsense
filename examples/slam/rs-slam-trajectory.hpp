@@ -447,6 +447,9 @@ public:
         };
         //load_map();
     }
+    void set_in_map_file_path(const std::string& map_file) { in_map_file_path = map_file; }
+    void set_out_map_file_path(const std::string& map_file) { out_map_file_path = map_file; }
+    std::vector<std::pair<rs2_pose,tracked_point>>& get_nodes() { return nodes; }
     void save_pose_as_static_node(){ printf("save pose as static node\n"); nodes.push_back(last_pose); }
     void clear_static_nodes(){ printf("clear static nodes\n"); nodes.clear();}
     void load_map() {
@@ -474,13 +477,12 @@ public:
             float r[16];
             unsigned int tracker_conf = 3;
             if(tm_sensor->get_static_node("node" + std::to_string(i), pose.translation, pose.rotation)){
-                calc_transform(pose, r);
+                tracker::calc_transform(pose, r);
                 nodes.push_back({pose, tracked_point{rs2_vector{r[12],r[13],r[14]}, tracker_conf}});
                 std::cout << i << " nodes are loaded" << std::endl;
             }else{ break; }
         }
     }
-    
     void save_map() {
         for(int i=0; i<nodes.size(); ++i){
             try{
@@ -504,6 +506,14 @@ public:
             case 'q': case 81: _app.close();               break;
         }
     }
+    // Calculates transformation matrix based on pose data from the adjustment layer
+    void calc_transform(const rs2_quaternion& q, const rs2_vector& t, float mat[16])
+    {
+        rs2_pose pose = {};
+        pose.rotation = q;
+        pose.translation = t;
+        tracker::calc_transform(pose, mat);
+    }
     void add_to_trajectory(const rs2_pose& pose_data, const float r[16])
     {
         // Create a new point to be added to the trajectory
@@ -515,7 +525,7 @@ public:
     }
     float* get_last_r(float r[16])
     {
-        this->calc_transform(last_pose.first, r);
+        tracker::calc_transform(last_pose.first, r);
         return r;
     }
     virtual void draw_trajectory() override
@@ -590,7 +600,7 @@ int main2(int argc, char * argv[]) try
 
         float r[16];
         // Calculate current transformation matrix
-        tracker.calc_transform(pose_data, r);
+        tracker.tracker::calc_transform(pose_data, r);
         // add to trajectory
         tracker.add_to_trajectory(pose_data, r);
         // Draw the trajectory from different perspectives
