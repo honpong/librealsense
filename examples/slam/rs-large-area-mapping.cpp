@@ -125,84 +125,22 @@ int main(int c, char * v[]) try
     std::shared_ptr<rs2::pose_sensor> tm_sensor;
     if(!playback_file)
         tm_sensor = std::make_shared<rs2::pose_sensor>(pipeline_profile.get_device().first<rs2::pose_sensor>());
-        
-    // Create objects for rendering the camera, the trajectory and the split screen
-    camera_renderer cam_renderer;
-        
+
     struct large_map_manager : public map_manager
     {
-        large_map_manager(window& app_, rs2::pipeline& pipe_, std::shared_ptr<rs2::pose_sensor>& sensor_) : map_manager(app_, pipe_, sensor_)
-        {}
-        
-        void set_in_map_file_path(const std::string& map_file) { in_map_file_path = map_file; }
-        void set_out_map_file_path(const std::string& map_file) { out_map_file_path = map_file; }
-        std::vector<std::pair<rs2_pose,tracked_point>>& get_nodes() { return nodes; }
-        
-        // Calculates transformation matrix based on pose data from the adjustment layer
-        void calc_transform(const transformation& p, float mat[16])
-        {
-            rs2_quaternion q = {p.Q.x(), p.Q.y(), p.Q.z(), p.Q.w()};
-            rs2_vector t = {p.T.x(), p.T.y(), p.T.z()};
-            // Set the matrix as column-major for convenient work with OpenGL and rotate by 180 degress (by negating 1st and 3rd columns)
-            mat[0] = -(1 - 2 * q.y*q.y - 2 * q.z*q.z); mat[4] = 2 * q.x*q.y - 2 * q.z*q.w;     mat[8] = -(2 * q.x*q.z + 2 * q.y*q.w);      mat[12] = t.x;
-            mat[1] = -(2 * q.x*q.y + 2 * q.z*q.w);     mat[5] = 1 - 2 * q.x*q.x - 2 * q.z*q.z; mat[9] = -(2 * q.y*q.z - 2 * q.x*q.w);      mat[13] = t.y;
-            mat[2] = -(2 * q.x*q.z - 2 * q.y*q.w);     mat[6] = 2 * q.y*q.z + 2 * q.x*q.w;     mat[10] = -(1 - 2 * q.x*q.x - 2 * q.y*q.y); mat[14] = t.z;
-            mat[3] = 0.0f;                             mat[7] = 0.0f;                          mat[11] = 0.0f;                             mat[15] = 1.0f;
+        large_map_manager(window& app_, rs2::pipeline& pipe_, std::shared_ptr<rs2::pose_sensor>& sensor_) : map_manager(app_, pipe_, sensor_) {}
+        void calc_transform(const transformation& H, float mat[16]){ map_manager::calc_transform(rs2_quaternion{H.Q.x(),H.Q.y(),H.Q.z(),H.Q.w()}, rs2_vector{H.T.x(),H.T.y(),H.T.z()},mat);
         }
-        
-        void add_to_trajectory(const rs2_pose& pose_data, const float r[16])
-        {
-            // Create a new point to be added to the trajectory
-            tracked_point p{ rs2_vector{r[12], r[13], r[14]} , pose_data.tracker_confidence };
-            // Register the new point
-            tracker::add_to_trajectory(p);
-            // Save latest pose data
-            last_pose = {pose_data, p};
-        }
-        
     } mmanager(app, pipe, tm_sensor);
-    
     if(in_map_file){ mmanager.set_in_map_file_path(std::string(in_map_file)); mmanager.load_map();}
     if(out_map_file){ mmanager.set_out_map_file_path(std::string(out_map_file));}
         
-    split_screen_renderer screen_renderer(app.width(), app.height(), mmanager, cam_renderer);
-    
-    // Start pipeline with chosen configuration
-    adjustment_layer adjust([&](adjustment_layer::landmark_t& landmark, void* handle) -> bool {
-        rs2_vector pos;
-        rs2_quaternion orient;
-        landmark.valid = tm_sensor->get_static_node(landmark.guid, pos, orient);
-        landmark.H_tracker_stage.Q = quaternion(orient.w, orient.x, orient.y, orient.z);
-        landmark.H_tracker_stage.T = v3(pos.x,pos.y,pos.z);
+    rs_adjustment_layer<large_map_manager> adjust(mmanager, tm_sensor);
         
-        std::cout << "[T265   ] Get static node : " << landmark.guid << " at ";
-        if(landmark.valid){ std::cout << landmark.H_tracker_stage.T << std::endl; }
-        else { std::cout << " FAILED " << std::endl; }
-        return landmark.valid;
-    });
-    adjust.set_switch_landmark_callback([&](adjustment_layer::landmark_t* landmark1, adjustment_layer::landmark_t* landmark0, adjustment_layer* adjust){
-        auto str = [](adjustment_layer::landmark_t* l){ return l->guid+" ("+std::to_string(l->distance_to_camera)+"m)"; };
-        std::cout << "[ADJUSTM] " << (landmark0? "Switch ref. from "+str(landmark0)+" to " : "Start ref. be ") << str(landmark1) << std::endl;
-    });
-    adjust.set_switch_landmark_threshold(0.2);
-    
-    // Add relocalization callback
-    tm_sensor->set_notifications_callback([&](const rs2::notification& n) {
-        if (n.get_category() == RS2_NOTIFICATION_CATEGORY_POSE_RELOCALIZATION) {
-            std::cout << "Relocalization Event Detected." << std::endl;
-            mmanager.load_nodes();
-            adjust.reset_landmark();
-            auto& nodes = mmanager.get_nodes();
-            for(int i=0; i<(int)nodes.size(); ++i){
-                auto stage = to_transformation(nodes[i].first);
-                adjust.set_landmark(std::string("node")+std::to_string(i), stage.Q, stage.T);
-                std::cout << "[ADJUSTM] Set landmark " << "node" << i << " at " << stage.T << std::endl;
-            }
-            adjust.config_landmark_switch_nearest(true);
-            adjust.set_relocalization_linked_map_event();
-        }
-    });
-    
+    // Create objects for rendering the camera, the trajectory and the split screen
+    camera_renderer cam_renderer;
+    split_screen_renderer screen_renderer(app.width(), app.height(), mmanager, cam_renderer);
+
     pipe.start(cfg);
         
     // Main loop
@@ -222,14 +160,12 @@ int main(int c, char * v[]) try
         if(adjusted_data.valid){
             // Calculate current adjusted transformation matrix
             mmanager.calc_transform(adjusted_data.H_adjusted_camera, r);
-            // add to trajectory
-            mmanager.add_to_trajectory(pose_data, r);
-            // Draw the trajectory from different perspectives
         }else{
             mmanager.tracker::calc_transform(pose_data, r);
-            mmanager.add_to_trajectory(pose_data, r);
         }
-        
+        // add to trajectory
+        mmanager.add_to_trajectory(pose_data, r);
+        // Draw the trajectory from different perspectives
         screen_renderer.draw_windows(app.width(), app.height(), app_state, r);
     }
         
