@@ -452,7 +452,7 @@ namespace rs2
         /**
          * Load relocalization map onto device. Only one relocalization map can be imported at a time;
          * any previously existing map will be overwritten.
-         * The imported map exists simultaneously with the map created during the most tracking session after start(),
+         * The imported map exists simultaneously with the map created during the most recent tracking session after start(),
          * and they are merged after the imported map is relocalized.
          * This operation must be done before start().
          * \param[in] lmap_buf map data as a binary blob
@@ -527,6 +527,22 @@ namespace rs2
         {
             rs2_error* e = nullptr;
             auto res = rs2_get_static_node(_sensor.get(), guid.c_str(), &pos, &orient, &e);
+            error::handle(e);
+            return !!res;
+        }
+
+        bool set_pose_origin(const std::string& guid, double& effective_time) const
+        {
+            rs2_error* e = nullptr;
+            auto res = rs2_set_pose_origin_node(_sensor.get(), guid.c_str(), &effective_time, &e);
+            error::handle(e);
+            return !!res;
+        }
+
+        bool set_pose_origin(const uint16_t mapId, double& effective_time) const
+        {
+            rs2_error* e = nullptr;
+            auto res = rs2_set_pose_origin_map_id(_sensor.get(), mapId, &effective_time, &e);
             error::handle(e);
             return !!res;
         }

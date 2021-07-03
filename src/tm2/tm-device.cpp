@@ -201,7 +201,7 @@ namespace librealsense
         bool is_read_only() const override { return s._is_streaming; }
 
         explicit tracking_mode_option(tm2_sensor& sensor, const char *description_) :
-            s(sensor), description(description_), option_base(option_range{ 0, 1, !!(sensor._tm_mode & flag) ^ invert ? 1.f : 0.f, 1 }) { }
+            s(sensor), description(description_), option_base(option_range{ 0, 1, 1, !!(sensor._tm_mode & flag) ^ invert ? 1.f : 0.f }) { }
 
     private:
         tm2_sensor &s;
@@ -387,7 +387,7 @@ namespace librealsense
             {
                 profile->tag_profile(profile_tag::PROFILE_TAG_DEFAULT | profile_tag::PROFILE_TAG_SUPERSET);
             }
-            stream_profile sp = { stream, profile->get_stream_index(), p.width, p.height, p.fps, profile->get_format() };
+            stream_profile sp = { profile->get_format(), stream, profile->get_stream_index(), p.width, p.height, p.fps };
             auto intrinsics = get_intrinsics(sp);
             profile->set_intrinsics([intrinsics]() { return intrinsics; });
             profile_map[SET_SENSOR_ID(SensorType::Fisheye, profile->get_stream_index() - 1)] = profile;
@@ -1534,6 +1534,40 @@ namespace librealsense
         throw io_exception(to_string() << "Unexpected error getting static node, status = " << (uint32_t)status);
     }
 
+    bool tm2_sensor::set_pose_origin(const std::string& guid, double& effective_time) const
+    {
+        if (!_tm_dev)
+            throw wrong_api_call_sequence_exception("T2xx tracking device is not available");
+
+        auto status = _tm_dev->SetPoseOrigin(guid.c_str(), effective_time);
+        if (status == perc::Status::SUCCESS)
+        {
+            return true;
+        }
+
+        effective_time = 0;
+        LOG_ERROR("set_pose_origin node failed");
+
+        return false;
+    }
+
+    bool tm2_sensor::set_pose_origin(const uint16_t mapId, double& effective_time) const
+    {
+        if (!_tm_dev)
+            throw wrong_api_call_sequence_exception("T2xx tracking device is not available");
+
+        auto status = _tm_dev->SetPoseOrigin(mapId, effective_time);
+        if (status == perc::Status::SUCCESS)
+        {
+            return true;
+        }
+
+        effective_time = 0;
+        LOG_ERROR("set_pose_origin map ID failed");
+
+        return false;
+    }
+
 
     bool tm2_sensor::load_wheel_odometery_config(const std::vector<uint8_t>& odometry_config_buf) const
     {
@@ -1664,6 +1698,7 @@ namespace librealsense
         _sensor->register_option(rs2_option::RS2_OPTION_ENABLE_RELOCALIZATION,      std::make_shared<tracking_mode_option<perc::SIXDOF_MODE_ENABLE_RELOCALIZATION,       perc::SIXDOF_MODE_ENABLE_MAPPING, false>>(*_sensor, "Use appearance based relocalization (depends on mapping)"));
         _sensor->register_option(rs2_option::RS2_OPTION_ENABLE_POSE_JUMPING,        std::make_shared<tracking_mode_option<perc::SIXDOF_MODE_DISABLE_JUMPING,             perc::SIXDOF_MODE_ENABLE_MAPPING,  true>>(*_sensor, "Allow pose jumping (depends on mapping)"));
         _sensor->register_option(rs2_option::RS2_OPTION_ENABLE_DYNAMIC_CALIBRATION, std::make_shared<tracking_mode_option<perc::SIXDOF_MODE_DISABLE_DYNAMIC_CALIBRATION, perc::SIXDOF_MODE_NORMAL,          true>>(*_sensor, "Enable dynamic calibration (recommended)"));
+        _sensor->register_option(rs2_option::RS2_OPTION_ENABLE_MAP_PRESERVATION,    std::make_shared<tracking_mode_option<perc::SIXDOF_MODE_ENABLE_MAP_PRESERVATION,     perc::SIXDOF_MODE_ENABLE_MAPPING, false>>(*_sensor, "Preserve the map from the previous run as if it was loaded"));
 
         // Assing the extrinsic nodes to the default group
         auto tm2_profiles = _sensor->get_stream_profiles();

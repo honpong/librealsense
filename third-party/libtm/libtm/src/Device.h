@@ -64,6 +64,8 @@ namespace perc
         virtual Status SetLocalizationData(Listener* listener, uint32_t length, const uint8_t* buffer) override;
         virtual Status SetStaticNode(const char* guid, const TrackingData::RelativePose& relativePose) override;
         virtual Status GetStaticNode(const char* guid, TrackingData::RelativePose& relativePose) override;
+        virtual Status SetPoseOrigin(uint16_t mapId, double_t& effectiveTime) override;
+        virtual Status SetPoseOrigin(const char* guid, double_t& effectiveTime) override;
         virtual Status SetGeoLocation(const TrackingData::GeoLocalization& geoLocation) override;
         virtual Status EepromRead(uint16_t offset, uint16_t size, uint8_t* buffer, uint16_t& actual) override;
         virtual Status EepromWrite(uint16_t offset, uint16_t size, uint8_t* buffer, uint16_t& actual, bool verify = false) override;

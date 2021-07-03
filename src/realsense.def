@@ -309,6 +309,8 @@ EXPORTS
     rs2_export_localization_map
     rs2_set_static_node
     rs2_get_static_node
+    rs2_set_pose_origin_node
+    rs2_set_pose_origin_map_id
     rs2_load_wheel_odometry_config
     rs2_send_wheel_odometry
     rs2_get_processing_block
@@ -325,3 +327,10 @@ EXPORTS
     rs2_update_firmware_unsigned
     rs2_update_firmware_unsigned_cpp
     rs2_enter_update_state
+    rs2_run_on_chip_calibration_cpp
+    rs2_run_tare_calibration_cpp
+    rs2_run_on_chip_calibration
+    rs2_run_tare_calibration
+    rs2_get_calibration_table
+    rs2_set_calibration_table
+
